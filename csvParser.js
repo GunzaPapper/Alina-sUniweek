@@ -1,211 +1,104 @@
 // FILE: csvParser.js
-// UniWeek — robust CSV import for schedule
-// Exports function expected by app.js:
-//   importScheduleFromCsv(csvText) -> { ok, msg, lessons }
+// Exports: importScheduleFromCsv(csvText) -> { ok, msg, lessons }
 
-const DAY_ALIASES = new Map([
-  // EN
-  ["monday", "monday"],
-  ["tuesday", "tuesday"],
-  ["wednesday", "wednesday"],
-  ["thursday", "thursday"],
-  ["friday", "friday"],
-  ["saturday", "saturday"],
-  ["sunday", "sunday"],
+function safe(s){ return String(s ?? "").trim(); }
 
-  // RU short
-  ["пн", "monday"],
-  ["вт", "tuesday"],
-  ["ср", "wednesday"],
-  ["чт", "thursday"],
-  ["пт", "friday"],
-  ["сб", "saturday"],
-  ["вс", "sunday"],
-
-  // RU full
-  ["понедельник", "monday"],
-  ["вторник", "tuesday"],
-  ["среда", "wednesday"],
-  ["четверг", "thursday"],
-  ["пятница", "friday"],
-  ["суббота", "saturday"],
-  ["воскресенье", "sunday"],
-]);
-
-function normStr(v) {
-  return String(v ?? "").trim();
-}
-function normLower(v) {
-  return normStr(v).toLowerCase();
-}
-
-function normalizeDay(v) {
-  const key = normLower(v);
-  return DAY_ALIASES.get(key) || key;
-}
-
-function normalizeWeekType(v) {
-  const s = normLower(v);
-  if (!s) return "both";
-
-  // both/any
-  if (["both", "any", "all", "every", "все", "оба"].includes(s)) return "both";
-
-  // odd
-  if (
-    s === "odd" ||
-    s === "1" ||
-    s.includes("числ") ||
-    s.includes("numerator")
-  ) return "odd";
-
-  // even
-  if (
-    s === "even" ||
-    s === "2" ||
-    s.includes("знам") ||
-    s.includes("denominator")
-  ) return "even";
-
-  // fallback: keep, but app will likely treat unknown as both
-  return s;
-}
-
-function normalizeTime(v) {
-  return normStr(v);
-}
-
-function normalizeColor(v) {
-  const s = normStr(v);
-  if (!s) return "";
-  const hex = s.startsWith("#") ? s.slice(1) : s;
-  if (/^[0-9a-fA-F]{6}$/.test(hex)) return "#" + hex.toUpperCase();
-  if (/^[0-9a-fA-F]{3}$/.test(hex)) return "#" + hex.toUpperCase();
-  return s;
-}
-
-/** CSV tokenizer supporting quotes and escaped quotes */
-function parseCsv(text) {
+function parseCsv(text){
+  // CSV with quotes support
   const rows = [];
-  let row = [];
   let cur = "";
   let inQ = false;
+  const out = [];
 
-  const pushCell = () => {
-    row.push(cur);
-    cur = "";
-  };
-  const pushRow = () => {
-    const cleaned = row.map(c => String(c ?? "").trim());
-    if (cleaned.some(c => c !== "")) rows.push(cleaned);
-    row = [];
-  };
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
 
-  const s = String(text ?? "");
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
-    const next = s[i + 1];
+    if (ch === '"' && next === '"') { cur += '"'; i++; continue; }
+    if (ch === '"') { inQ = !inQ; continue; }
 
-    // escaped quote
-    if (ch === '"' && inQ && next === '"') {
-      cur += '"';
-      i++;
-      continue;
-    }
-    if (ch === '"') {
-      inQ = !inQ;
-      continue;
-    }
-    if (ch === "," && !inQ) {
-      pushCell();
-      continue;
-    }
+    if (ch === "," && !inQ) { out.push(cur); cur = ""; continue; }
+
     if ((ch === "\n" || ch === "\r") && !inQ) {
       if (ch === "\r" && next === "\n") i++;
-      pushCell();
-      pushRow();
+      out.push(cur); cur = "";
+      rows.push(out.slice());
+      out.length = 0;
       continue;
     }
+
     cur += ch;
   }
 
-  if (cur.length || row.length) {
-    pushCell();
-    pushRow();
-  }
-  return rows;
+  if (cur.length || out.length) { out.push(cur); rows.push(out.slice()); }
+  return rows.filter(r => r.some(c => safe(c) !== ""));
 }
 
-function headerIndexMap(headerRow) {
-  const map = new Map();
-  headerRow.forEach((h, idx) => {
-    const key = normLower(h).replace(/\s+/g, "");
-    if (key) map.set(key, idx);
-  });
-  return map;
+function normalizeHeader(h){
+  const x = safe(h).toLowerCase();
+  // accept variants
+  if (x === "coursename") return "courseName";
+  if (x === "course_name") return "courseName";
+  if (x === "dayofweek") return "dayOfWeek";
+  if (x === "starttime") return "startTime";
+  if (x === "endtime") return "endTime";
+  if (x === "weektype") return "weekType";
+  return h; // keep original if already proper
 }
 
-function getCell(row, idxMap, keys) {
-  for (const k of keys) {
-    const kk = normLower(k).replace(/\s+/g, "");
-    if (idxMap.has(kk)) {
-      const idx = idxMap.get(kk);
-      return normStr(row[idx]);
-    }
-  }
-  return "";
+function normalizeWeekType(v){
+  const x = safe(v).toLowerCase();
+  if (!x) return "both";
+  if (x === "both" || x === "any") return "both";
+  if (x === "odd") return "odd";
+  if (x === "even") return "even";
+  return "both";
 }
 
-/**
- * Expected columns:
- * courseName,type,dayOfWeek,startTime,endTime,weekType,location,color
- * (also accepts lowercase variations)
- */
-export function importScheduleFromCsv(csvText) {
+function normalizeColor(v){
+  let x = safe(v);
+  if (!x) return "";
+  // allow "FF8FB1" or "#FF8FB1"
+  if (/^[0-9a-fA-F]{6}$/.test(x)) x = "#" + x;
+  if (/^#[0-9a-fA-F]{6}$/.test(x)) return x;
+  return x; // if user uses named colors, keep
+}
+
+export function importScheduleFromCsv(csvText){
   const rows = parseCsv(csvText);
-  if (!rows.length) return { ok: false, msg: "CSV пустой", lessons: [] };
+  if (!rows.length) return { ok:false, msg:"CSV пустой", lessons: [] };
 
-  const header = rows[0];
-  const idxMap = headerIndexMap(header);
+  const rawHeader = rows[0].map(x => safe(x));
+  const header = rawHeader.map(normalizeHeader);
 
-  const required = [
-    ["courseName", "coursename"],
-    ["type"],
-    ["dayOfWeek", "dayofweek"],
-    ["startTime", "starttime"],
-    ["endTime", "endtime"],
-    ["weekType", "weektype"],
-    ["location"],
-    ["color"],
-  ];
+  const idx = (name) => header.findIndex(h => h === name);
 
-  for (const variants of required) {
-    const has = variants.some(v => idxMap.has(normLower(v).replace(/\s+/g, "")));
-    if (!has) return { ok: false, msg: `Нет колонки: ${variants[0]}`, lessons: [] };
+  const required = ["courseName","type","dayOfWeek","startTime","endTime","weekType","location","color"];
+  for (const k of required) {
+    if (idx(k) === -1) {
+      return { ok:false, msg:`Нет колонки: ${k}. В заголовке должно быть courseName,type,dayOfWeek,startTime,endTime,weekType,location,color`, lessons: [] };
+    }
   }
 
   const lessons = [];
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
+  for (let i = 1; i < rows.length; i++){
+    const r = rows[i];
+    const get = (k) => safe(r[idx(k)]);
 
-    const courseName = getCell(row, idxMap, ["courseName", "coursename"]);
+    const courseName = get("courseName");
     if (!courseName) continue;
 
     lessons.push({
       courseName,
-      type: normLower(getCell(row, idxMap, ["type"])),
-      dayOfWeek: normalizeDay(getCell(row, idxMap, ["dayOfWeek", "dayofweek"])),
-      startTime: normalizeTime(getCell(row, idxMap, ["startTime", "starttime"])),
-      endTime: normalizeTime(getCell(row, idxMap, ["endTime", "endtime"])),
-      weekType: normalizeWeekType(getCell(row, idxMap, ["weekType", "weektype"])),
-      location: getCell(row, idxMap, ["location"]),
-      color: normalizeColor(getCell(row, idxMap, ["color"])),
+      type: get("type").toLowerCase(),
+      dayOfWeek: get("dayOfWeek").toLowerCase(),
+      startTime: get("startTime"),
+      endTime: get("endTime"),
+      weekType: normalizeWeekType(get("weekType")),
+      location: get("location"),
+      color: normalizeColor(get("color")),
     });
   }
 
-  if (!lessons.length) {
-    return { ok: false, msg: "Не найдено ни одной строки (проверь courseName)", lessons: [] };
-  }
-
-  return { ok: true, msg: `Импортировано: ${lessons.length}`, lessons };
+  return { ok:true, msg:`Импортировано: ${lessons.length}`, lessons };
 }
