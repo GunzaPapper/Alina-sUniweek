@@ -1,231 +1,230 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8" />
-  <!-- anti-zoom + safe area -->
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#F7A8C6" />
+    <meta charset="utf-8" />
+    <!-- anti-zoom + safe area -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#F7A8C6" />
 
-  <!-- PWA / iOS -->
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- PWA / iOS -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
-  <title>Alina's UniWeek</title>
+    <title>Alina's UniWeek</title>
 
-  <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="manifest" href="./manifest.webmanifest" />
 
-  <!-- icons: поставь реальные файлы в /icons -->
-<link rel="apple-touch-icon" href="./icons/icon-180x180.png" />
-<link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32x32.png" />
-<link rel="manifest" href="./manifest.webmanifest" />
+    <!-- icons: поставь реальные файлы в /icons -->
+    <link rel="apple-touch-icon" href="./icons/icon-180x180.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32x32.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
 
-  <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css" />
 </head>
 
 <body>
-  <div class="appRoot" id="appRoot">
-    <!-- Top bar -->
-    <header class="topBar" id="topBar">
-      <div class="topBar__left">
-        <button class="iconBtn" id="dayPrevBtn" type="button" aria-label="Предыдущий день">‹</button>
-      </div>
+    <div class="appRoot" id="appRoot">
+        <!-- Top bar -->
+        <header class="topBar" id="topBar">
+            <div class="topBar__left">
+                <button class="iconBtn" id="dayPrevBtn" type="button" aria-label="Предыдущий день">‹</button>
+            </div>
 
-      <div class="topBar__center">
-        <div class="topBar__title" id="monthTitle">Alina's UniWeek 💗</div>
-        <div class="topBar__subtitle" id="weekSubtitle">—</div>
-      </div>
+            <div class="topBar__center">
+                <div class="topBar__title" id="monthTitle">Alina's UniWeek 💗</div>
+                <div class="topBar__subtitle" id="weekSubtitle">—</div>
+            </div>
 
-      <div class="topBar__right">
-        <button class="iconBtn" id="calendarOpenBtn" type="button" aria-label="Открыть календарь">📅</button>
-        <button class="iconBtn" id="dayNextBtn" type="button" aria-label="Следующий день">›</button>
-      </div>
-    </header>
+            <div class="topBar__right">
+                <button class="iconBtn" id="calendarOpenBtn" type="button" aria-label="Открыть календарь">📅</button>
+                <button class="iconBtn" id="dayNextBtn" type="button" aria-label="Следующий день">›</button>
+            </div>
+        </header>
 
-    <!-- Day strip -->
-    <section class="dayStripWrap" id="dayStripWrap">
-      <div class="dayStrip" id="dayStrip" aria-label="Дни недели"></div>
-    </section>
+        <!-- Day strip -->
+        <section class="dayStripWrap" id="dayStripWrap">
+            <div class="dayStrip" id="dayStrip" aria-label="Дни недели"></div>
+        </section>
 
-    <!-- Main -->
-    <main class="main" id="main">
-      <section class="screen screen--active" id="screenSchedule" aria-label="Расписание">
-        <div class="card card--soft fadeIn" id="nextLessonCard" aria-live="polite"></div>
+        <!-- Main -->
+        <main class="main" id="main">
+            <section class="screen screen--active" id="screenSchedule" aria-label="Расписание">
+                <div class="card card--soft fadeIn" id="nextLessonCard" aria-live="polite"></div>
 
-        <div class="card fadeIn">
-          <div class="cardHeader">
-            <div class="cardTitle" id="scheduleTitle">Пары</div>
-            <div class="cardHint" id="scheduleHint">—</div>
-          </div>
-          <div class="lessonList" id="lessonList"></div>
-        </div>
-      </section>
+                <div class="card fadeIn">
+                    <div class="cardHeader">
+                        <div class="cardTitle" id="scheduleTitle">Пары</div>
+                        <div class="cardHint" id="scheduleHint">—</div>
+                    </div>
+                    <div class="lessonList" id="lessonList"></div>
+                </div>
+            </section>
 
-      <section class="screen" id="screenWishes" aria-label="Пожелания">
-        <div class="card fadeIn">
-          <div class="cardHeader">
-            <div class="cardTitle">Пожелание 💗</div>
-            <button class="btn btn--secondary" id="wishMoreBtn" type="button">Ещё</button>
-          </div>
-          <div class="wishBox" id="wishBox"></div>
-        </div>
+            <section class="screen" id="screenWishes" aria-label="Пожелания">
+                <div class="card fadeIn">
+                    <div class="cardHeader">
+                        <div class="cardTitle">Пожелание 💗</div>
+                        <button class="btn btn--secondary" id="wishMoreBtn" type="button">Ещё</button>
+                    </div>
+                    <div class="wishBox" id="wishBox"></div>
+                </div>
 
-        <div class="card fadeIn">
-          <div class="cardHeader">
-            <div class="cardTitle">Игры</div>
-            <div class="cardHint">скоро подключим ✨</div>
-          </div>
+                <div class="card fadeIn">
+                    <div class="cardHeader">
+                        <div class="cardTitle">Игры</div>
+                        <div class="cardHint">скоро подключим ✨</div>
+                    </div>
 
-          <div class="gameGrid">
-            <button class="gameCard" id="openQuizBtn" type="button">
-              <div class="gameCard__emoji">🧠</div>
-              <div class="gameCard__title">Quiz</div>
-              <div class="gameCard__sub">в разработке</div>
+                    <div class="gameGrid">
+                        <button class="gameCard" id="openQuizBtn" type="button">
+                            <div class="gameCard__emoji">🧠</div>
+                            <div class="gameCard__title">Quiz</div>
+                            <div class="gameCard__sub">в разработке</div>
+                        </button>
+
+                        <button class="gameCard" id="openMemoryBtn" type="button">
+                            <div class="gameCard__emoji">🍬</div>
+                            <div class="gameCard__title">Memory</div>
+                            <div class="gameCard__sub">в разработке</div>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card fadeIn hidden" id="quizCard">
+                    <div class="cardHeader">
+                        <button class="chipBtn" id="quizBackBtn" type="button">← Назад</button>
+                        <div class="cardTitle">Quiz</div>
+                        <div class="cardHint">—</div>
+                    </div>
+                    <div id="quizRoot"></div>
+                </div>
+
+                <div class="card fadeIn hidden" id="memoryCard">
+                    <div class="cardHeader">
+                        <button class="chipBtn" id="memoryBackBtn" type="button">← Назад</button>
+                        <div class="cardTitle">Memory</div>
+                        <div class="cardHint">—</div>
+                    </div>
+                    <div id="memoryRoot"></div>
+                </div>
+            </section>
+
+            <section class="screen" id="screenNotes" aria-label="Заметки">
+                <div class="card fadeIn">
+                    <div class="cardHeader">
+                        <div class="cardTitle">Заметки</div>
+                        <button class="btn" id="noteCreateBtn" type="button">Новая</button>
+                    </div>
+
+                    <div class="notesTop">
+                        <input class="input" id="notesSearch" type="search" placeholder="Поиск…" />
+                    </div>
+
+                    <div class="notesList" id="notesList"></div>
+                    <div class="empty__text" style="margin-top:10px;">(подключим notes.js после основы)</div>
+                </div>
+
+                <div class="card fadeIn hidden" id="noteEditorCard"></div>
+            </section>
+
+            <section class="screen" id="screenSettings" aria-label="Настройки">
+                <div class="card fadeIn">
+                    <div class="cardHeader">
+                        <div class="cardTitle">Настройки</div>
+                        <div class="cardHint">всё хранится в этом браузере</div>
+                    </div>
+
+                    <div class="settingsGroup">
+                        <div class="settingsRow">
+                            <div>
+                                <div class="settingsLabel">Auto-неделя</div>
+                                <div class="settingsHint">по ANCHOR_DATE (числ/знам)</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="autoWeekToggle" />
+                                <span class="switch__ui"></span>
+                            </label>
+                        </div>
+
+                        <div class="settingsRow">
+                            <div class="settingsLabel">ANCHOR_DATE</div>
+                            <input class="input" id="anchorDateInput" placeholder="YYYY-MM-DD" inputmode="numeric" />
+                        </div>
+
+                        <div class="settingsRow" id="manualWeekRow">
+                            <div>
+                                <div class="settingsLabel">Неделя вручную</div>
+                                <div class="settingsHint">если auto выключен</div>
+                            </div>
+                            <div class="segmented" role="tablist">
+                                <button class="segBtn" id="weekOddBtn" type="button">Odd</button>
+                                <button class="segBtn" id="weekEvenBtn" type="button">Even</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div class="settingsGroup">
+                        <div class="settingsRow">
+                            <div>
+                                <div class="settingsLabel">Импорт CSV</div>
+                                <div class="settingsHint">courseName,type,dayOfWeek,startTime,endTime,weekType,location,color</div>
+                            </div>
+                            <label class="btn btn--secondary fileBtn">
+                                Выбрать файл
+                                <input id="csvInput" type="file" accept=".csv,text/csv" />
+                            </label>
+                        </div>
+
+                        <div class="settingsRow">
+                            <button class="btn btn--secondary" id="exportJsonBtn" type="button">Экспорт данных</button>
+                            <button class="btn btn--danger" id="resetAllBtn" type="button">Сбросить всё</button>
+                        </div>
+
+                        <div class="settingsRow">
+                            <div class="settingsLabel">Цвета предметов</div>
+                        </div>
+                        <div class="subjectColors" id="subjectColors"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Bottom tabs -->
+        <nav class="bottomTabs" aria-label="Навигация">
+            <button class="tab tab--active" id="tabSchedule" type="button">
+                <span class="tab__emoji">📅</span>
+                <span class="tab__label">Расписание</span>
             </button>
-
-            <button class="gameCard" id="openMemoryBtn" type="button">
-              <div class="gameCard__emoji">🍬</div>
-              <div class="gameCard__title">Memory</div>
-              <div class="gameCard__sub">в разработке</div>
+            <button class="tab" id="tabWishes" type="button">
+                <span class="tab__emoji">💗</span>
+                <span class="tab__label">Пожелания</span>
             </button>
-          </div>
-        </div>
+            <button class="tab" id="tabNotes" type="button">
+                <span class="tab__emoji">📝</span>
+                <span class="tab__label">Заметки</span>
+            </button>
+            <button class="tab" id="tabSettings" type="button">
+                <span class="tab__emoji">⚙️</span>
+                <span class="tab__label">Настройки</span>
+            </button>
+        </nav>
 
-        <div class="card fadeIn hidden" id="quizCard">
-          <div class="cardHeader">
-            <button class="chipBtn" id="quizBackBtn" type="button">← Назад</button>
-            <div class="cardTitle">Quiz</div>
-            <div class="cardHint">—</div>
-          </div>
-          <div id="quizRoot"></div>
-        </div>
-
-        <div class="card fadeIn hidden" id="memoryCard">
-          <div class="cardHeader">
-            <button class="chipBtn" id="memoryBackBtn" type="button">← Назад</button>
-            <div class="cardTitle">Memory</div>
-            <div class="cardHint">—</div>
-          </div>
-          <div id="memoryRoot"></div>
-        </div>
-      </section>
-
-      <section class="screen" id="screenNotes" aria-label="Заметки">
-        <div class="card fadeIn">
-          <div class="cardHeader">
-            <div class="cardTitle">Заметки</div>
-            <button class="btn" id="noteCreateBtn" type="button">Новая</button>
-          </div>
-
-          <div class="notesTop">
-            <input class="input" id="notesSearch" type="search" placeholder="Поиск…" />
-          </div>
-
-          <div class="notesList" id="notesList"></div>
-          <div class="empty__text" style="margin-top:10px;">(подключим notes.js после основы)</div>
-        </div>
-
-        <div class="card fadeIn hidden" id="noteEditorCard"></div>
-      </section>
-
-      <section class="screen" id="screenSettings" aria-label="Настройки">
-        <div class="card fadeIn">
-          <div class="cardHeader">
-            <div class="cardTitle">Настройки</div>
-            <div class="cardHint">всё хранится в этом браузере</div>
-          </div>
-
-          <div class="settingsGroup">
-            <div class="settingsRow">
-              <div>
-                <div class="settingsLabel">Auto-неделя</div>
-                <div class="settingsHint">по ANCHOR_DATE (числ/знам)</div>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="autoWeekToggle" />
-                <span class="switch__ui"></span>
-              </label>
+        <!-- Calendar modal (пока пустой — подключим позже) -->
+        <dialog class="modal" id="calendarModal">
+            <div class="modal__body">
+                <div class="modal__head">
+                    <div class="modal__title">Календарь</div>
+                    <button class="iconBtn" id="calendarCloseBtn" type="button" aria-label="Закрыть">✕</button>
+                </div>
+                <div class="calendarRoot" id="calendarRoot"></div>
             </div>
+        </dialog>
+    </div>
 
-            <div class="settingsRow">
-              <div class="settingsLabel">ANCHOR_DATE</div>
-              <input class="input" id="anchorDateInput" placeholder="YYYY-MM-DD" inputmode="numeric" />
-            </div>
-
-            <div class="settingsRow" id="manualWeekRow">
-              <div>
-                <div class="settingsLabel">Неделя вручную</div>
-                <div class="settingsHint">если auto выключен</div>
-              </div>
-              <div class="segmented" role="tablist">
-                <button class="segBtn" id="weekOddBtn" type="button">Odd</button>
-                <button class="segBtn" id="weekEvenBtn" type="button">Even</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="divider"></div>
-
-          <div class="settingsGroup">
-            <div class="settingsRow">
-              <div>
-                <div class="settingsLabel">Импорт CSV</div>
-                <div class="settingsHint">courseName,type,dayOfWeek,startTime,endTime,weekType,location,color</div>
-              </div>
-              <label class="btn btn--secondary fileBtn">
-                Выбрать файл
-                <input id="csvInput" type="file" accept=".csv,text/csv" />
-              </label>
-            </div>
-
-            <div class="settingsRow">
-              <button class="btn btn--secondary" id="exportJsonBtn" type="button">Экспорт данных</button>
-              <button class="btn btn--danger" id="resetAllBtn" type="button">Сбросить всё</button>
-            </div>
-
-            <div class="settingsRow">
-              <div class="settingsLabel">Цвета предметов</div>
-            </div>
-            <div class="subjectColors" id="subjectColors"></div>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <!-- Bottom tabs -->
-    <nav class="bottomTabs" aria-label="Навигация">
-      <button class="tab tab--active" id="tabSchedule" type="button">
-        <span class="tab__emoji">📅</span>
-        <span class="tab__label">Расписание</span>
-      </button>
-      <button class="tab" id="tabWishes" type="button">
-        <span class="tab__emoji">💗</span>
-        <span class="tab__label">Пожелания</span>
-      </button>
-      <button class="tab" id="tabNotes" type="button">
-        <span class="tab__emoji">📝</span>
-        <span class="tab__label">Заметки</span>
-      </button>
-      <button class="tab" id="tabSettings" type="button">
-        <span class="tab__emoji">⚙️</span>
-        <span class="tab__label">Настройки</span>
-      </button>
-    </nav>
-
-    <!-- Calendar modal (пока пустой — подключим позже) -->
-    <dialog class="modal" id="calendarModal">
-      <div class="modal__body">
-        <div class="modal__head">
-          <div class="modal__title">Календарь</div>
-          <button class="iconBtn" id="calendarCloseBtn" type="button" aria-label="Закрыть">✕</button>
-        </div>
-        <div class="calendarRoot" id="calendarRoot"></div>
-      </div>
-    </dialog>
-  </div>
-
-  <script type="module" src="./app.js"></script>
+    <script type="module" src="./app.js"></script>
 </body>
 </html>
-
 
