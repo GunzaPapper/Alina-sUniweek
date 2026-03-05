@@ -158,6 +158,8 @@ function renderTabs() {
     tab.classList.toggle("tab--active", state.screen === k);
     screen.classList.toggle("screen--active", state.screen === k);
   }
+  const appRoot = document.getElementById("appRoot");
+if (appRoot) appRoot.classList.toggle("settingsMode", state.screen === "settings");
 }
 
 function renderTopBar() {
@@ -621,4 +623,5 @@ document.addEventListener("DOMContentLoaded", async () => {
     showFatal(err);
   }
 });
+
 
