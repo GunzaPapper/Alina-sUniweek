@@ -1,6 +1,7 @@
 // app.js (CORE)
 // Основа: вкладки + верхняя панель/дни + импорт CSV + рендер расписания
 // Никакие второстепенные модули не требуются, чтобы приложение работало.
+import { openCalendar } from "./calendar.js";
 import { initNotes, openNotes } from "./notes.js";
 import { renderSchedule } from "./schedule.js";
 import { importScheduleFromCsv } from "./csvParser.js";
@@ -293,9 +294,20 @@ function bindEvents() {
   });
 
   $("#calendarOpenBtn")?.addEventListener("click", () => {
-    // календарь подключим потом, сейчас просто открываем пустой модал
-    $("#calendarModal")?.showModal?.();
+
+  const modal = $("#calendarModal");
+  modal?.showModal?.();
+
+  openCalendar({
+    state,
+    onPickDate: (date) => {
+      state.selectedDate = date;
+      modal?.close?.();
+      renderAllScheduleBits();
+    }
   });
+
+});
   $("#calendarCloseBtn")?.addEventListener("click", () => $("#calendarModal")?.close?.());
 
   // settings
