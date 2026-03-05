@@ -1,241 +1,189 @@
-﻿// FILE: js/schedule.js
+// FILE: schedule.js
+// UniWeek — schedule helpers + renderer (под твой styles.css)
 
-import * as storage from "./storage.js";
+const DAY_NAMES = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
 
-/* ===============================
-   Constants
-================================= */
-
-const LESSONS_KEY = "schedule.lessons";
-const SUBJECT_COLORS_KEY = "schedule.subjectColors";
-
-/* ===============================
-   Lesson Type Icons
-================================= */
-
-const TYPE_ICONS = {
-  lecture: "🎓",
-  seminar: "📝",
-  lab: "🧪",
-};
-
-function getTypeIcon(type) {
-  if (!type) return "📚";
-  const t = type.toLowerCase();
-  return TYPE_ICONS[t] || "📚";
+function esc(s) {
+  return String(s ?? "")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;");
 }
 
-/* ===============================
-   Helpers
-================================= */
-
-function timeToMinutes(t) {
-  if (!t) return 0;
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
+function fmtTime(t) {
+  return String(t || "").trim();
 }
 
-function normalizeLesson(l) {
-  return {
-    courseName: (l.courseName || "").trim(),
-    type: (l.type || "").trim().toLowerCase(),
-    dayOfWeek: (l.dayOfWeek || "").trim().toLowerCase(),
-    startTime: (l.startTime || "").trim(),
-    endTime: (l.endTime || "").trim(),
-    weekType: (l.weekType || "both").trim().toLowerCase(),
-    location: (l.location || "").trim(),
-    color: (l.color || "").trim(),
-  };
+function timeKey(t) {
+  // "08:00" -> "08:00"
+  // страховка если "8:0"
+  const x = fmtTime(t);
+  const m = x.match(/^(\d{1,2}):(\d{1,2})$/);
+  if (!m) return x;
+  const hh = String(m[1]).padStart(2,"0");
+  const mm = String(m[2]).padStart(2,"0");
+  return `${hh}:${mm}`;
 }
 
-/* ===============================
-   Storage
-================================= */
-
-export function getLessons() {
-  return storage.get(LESSONS_KEY, []);
+function isSameDay(a, b) {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
 }
 
-export function setLessons(list) {
-  const normalized = list.map(normalizeLesson);
-
-  const unique = removeDuplicates(normalized);
-
-  unique.sort((a, b) => {
-    return timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
-  });
-
-  storage.set(LESSONS_KEY, unique);
+function pickTypeIcon(type) {
+  const t = String(type || "").toLowerCase();
+  if (t === "lecture" || t === "лекция") return "🎓";
+  if (t === "seminar" || t === "семинар") return "📝";
+  return "📌";
 }
 
-function removeDuplicates(list) {
-  const seen = new Set();
-  const result = [];
-
-  list.forEach((l) => {
-    const key =
-      l.courseName +
-      "|" +
-      l.dayOfWeek +
-      "|" +
-      l.startTime +
-      "|" +
-      l.endTime +
-      "|" +
-      l.weekType +
-      "|" +
-      l.location;
-
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(l);
-    }
-  });
-
-  return result;
+function normalizeWeekType(w) {
+  const t = String(w || "").toLowerCase().trim();
+  if (!t) return "both";
+  if (t === "both" || t === "any" || t === "all") return "both";
+  if (t === "odd") return "odd";
+  if (t === "even") return "even";
+  return "both";
 }
 
-/* ===============================
-   Week Type
-================================= */
+/**
+ * weekResolver(date) -> "odd" | "even"
+ * ты отдашь сюда свою функцию из app.js
+ */
+export function lessonMatchesDate(lesson, date, weekResolver) {
+  const dow = DAY_NAMES[date.getDay()];
+  const lDow = String(lesson?.dayOfWeek || "").toLowerCase().trim();
+  if (lDow !== dow) return false;
 
-export function getWeekType(date) {
-  const auto = storage.get("week.auto", true);
+  const wt = normalizeWeekType(lesson?.weekType);
+  if (wt === "both") return true;
 
-  if (!auto) {
-    return storage.get("week.manual", "odd");
+  const cur = weekResolver?.(date) || "odd";
+  return wt === cur;
+}
+
+export function getLessonsForDate(schedule, date, weekResolver) {
+  const arr = Array.isArray(schedule) ? schedule : [];
+  return arr
+    .filter(l => lessonMatchesDate(l, date, weekResolver))
+    .slice()
+    .sort((a,b) => timeKey(a.startTime).localeCompare(timeKey(b.startTime)));
+}
+
+/**
+ * Рендерит список занятий + подсказку в шапке
+ * @param {HTMLElement} listEl  #lessonList
+ * @param {HTMLElement} hintEl  #scheduleHint
+ * @param {Array} lessons
+ * @param {Object} subjectColors { [courseName]: color }
+ */
+export function renderScheduleInto(listEl, hintEl, lessons, subjectColors = {}) {
+  if (!listEl || !hintEl) return;
+
+  const items = Array.isArray(lessons) ? lessons : [];
+  hintEl.textContent = items.length ? `${items.length} шт.` : "Пока пусто — импортируй CSV в Настройках";
+
+  if (!items.length) {
+    listEl.innerHTML = `
+      <div class="empty">
+        <div class="empty__title">Пока нет пар на этот день 💗</div>
+        <div class="empty__text">Зайди в «Настройки» → «Импорт CSV» и выбери файл расписания.</div>
+      </div>
+    `;
+    return;
   }
 
-  const anchorStr = storage.get("week.anchor", "2024-09-02");
-  const anchor = new Date(anchorStr);
+  listEl.innerHTML = items.map(l => {
+    const course = l.courseName || "—";
+    const color = (l.color || subjectColors[course] || "#F7A8C6").trim();
+    const icon = pickTypeIcon(l.type);
 
-  const diff = date - anchor;
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const week = Math.floor(days / 7);
+    // ВАЖНО: преподаватель в одной строке с аудиторией
+    const teacher = (l.teacher || "").trim();
+    const location = (l.location || "").trim();
+    const metaParts = [teacher, location].filter(Boolean);
+    const metaLine = metaParts.join(" • ");
 
-  return week % 2 === 0 ? "odd" : "even";
+    // неделя (если не both — показываем)
+    const wt = normalizeWeekType(l.weekType);
+    const wtLabel = wt === "both" ? "" : (wt === "odd" ? "Odd" : "Even");
+
+    return `
+      <div class="lessonCard">
+        <div class="lessonStripe" style="background:${esc(color)}"></div>
+        <div class="lessonBody">
+          <div class="lessonTop">
+            <div class="lessonTime">${esc(timeKey(l.startTime))}–${esc(timeKey(l.endTime))}</div>
+            <div class="lessonType">${icon}${wtLabel ? ` <span class="pill">${esc(wtLabel)}</span>` : ""}</div>
+          </div>
+
+          <div class="lessonName">${esc(course)}</div>
+
+          ${metaLine ? `<div class="lessonMeta"><span class="pill">${esc(metaLine)}</span></div>` : ""}
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 
-/* ===============================
-   Day Of Week
-================================= */
+/**
+ * Утилита для вычисления "следующей пары" из списка занятий на выбранный день.
+ * Возвращает lesson или null.
+ */
+export function getNextLessonForToday(lessons, now = new Date()) {
+  const items = Array.isArray(lessons) ? lessons : [];
+  if (!items.length) return null;
 
-function getDayName(date) {
-  const map = [
-    "sunday",
-    "monday",
-    "tuesday",
-    "wednesday",
-    "thursday",
-    "friday",
-    "saturday",
-  ];
-  return map[date.getDay()];
+  const pad2 = (n) => String(n).padStart(2,"0");
+  const cur = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+
+  // берём первую, у которой endTime > сейчас
+  return items.find(x => timeKey(x.endTime) > cur) || null;
 }
 
-/* ===============================
-   Get Lessons For Date
-================================= */
+export function renderNextLessonCard(cardEl, selectedDate, lessonsForSelectedDate) {
+  if (!cardEl) return;
 
-export function getLessonsForDate(date) {
-  const lessons = getLessons();
+  const now = new Date();
+  const same = isSameDay(now, selectedDate);
+  const items = Array.isArray(lessonsForSelectedDate) ? lessonsForSelectedDate : [];
 
-  const day = getDayName(date);
-  const weekType = getWeekType(date);
-
-  return lessons.filter((l) => {
-    if (l.dayOfWeek !== day) return false;
-
-    if (l.weekType === "both") return true;
-
-    if (l.weekType === weekType) return true;
-
-    return false;
-  });
-}
-
-/* ===============================
-   Subject Colors
-================================= */
-
-export function getSubjectColors() {
-  return storage.get(SUBJECT_COLORS_KEY, {});
-}
-
-export function setSubjectColor(subject, color) {
-  const colors = getSubjectColors();
-  colors[subject] = color;
-  storage.set(SUBJECT_COLORS_KEY, colors);
-}
-
-export function getSubjectColor(subject) {
-  const colors = getSubjectColors();
-  return colors[subject] || null;
-}
-
-/* ===============================
-   Lesson Card Rendering
-================================= */
-
-export function renderLessonCard(lesson) {
-  const card = document.createElement("div");
-  card.className = "lessonCard";
-
-  const stripe = document.createElement("div");
-  stripe.className = "lessonStripe";
-
-  const subjectColor = lesson.color || getSubjectColor(lesson.courseName);
-
-  if (subjectColor) {
-    stripe.style.background = subjectColor;
+  if (!same || !items.length) {
+    cardEl.innerHTML = `
+      <div class="nextLesson">
+        <div class="nextLesson__title">Следующая пара</div>
+        <div class="nextLesson__text">${same ? "Сегодня пар нет 💗" : "Выбери сегодняшний день, чтобы увидеть следующую пару"}</div>
+      </div>
+    `;
+    return;
   }
 
-  const body = document.createElement("div");
-  body.className = "lessonBody";
+  const next = getNextLessonForToday(items, now);
 
-  const top = document.createElement("div");
-  top.className = "lessonTop";
-
-  const time = document.createElement("div");
-  time.className = "lessonTime";
-  time.textContent = `${lesson.startTime} – ${lesson.endTime}`;
-
-  const type = document.createElement("div");
-  type.className = "lessonType";
-  type.textContent = `${getTypeIcon(lesson.type)} ${lesson.type}`;
-
-  top.appendChild(time);
-  top.appendChild(type);
-
-  const name = document.createElement("div");
-  name.className = "lessonName";
-  name.textContent = lesson.courseName;
-
-  const meta = document.createElement("div");
-  meta.className = "lessonMeta";
-
-  if (lesson.location) {
-    const loc = document.createElement("span");
-    loc.className = "pill";
-    loc.textContent = `📍 ${lesson.location}`;
-    meta.appendChild(loc);
+  if (!next) {
+    cardEl.innerHTML = `
+      <div class="nextLesson">
+        <div class="nextLesson__title">Следующая пара</div>
+        <div class="nextLesson__text">На сегодня всё 💗</div>
+      </div>
+    `;
+    return;
   }
 
-  const week = document.createElement("span");
-  week.className = "pill";
+  const teacher = (next.teacher || "").trim();
+  const location = (next.location || "").trim();
+  const meta = [teacher, location].filter(Boolean).join(" • ");
 
-  if (lesson.weekType === "odd") week.textContent = "Числитель";
-  else if (lesson.weekType === "even") week.textContent = "Знаменатель";
-  else week.textContent = "Обе недели";
-
-  meta.appendChild(week);
-
-  body.appendChild(top);
-  body.appendChild(name);
-  body.appendChild(meta);
-
-  card.appendChild(stripe);
-  card.appendChild(body);
-
-  return card;
+  cardEl.innerHTML = `
+    <div class="nextLesson">
+      <div class="nextLesson__title">Следующая пара</div>
+      <div class="lessonName">${esc(next.courseName || "—")}</div>
+      <div class="lessonMeta">
+        <span class="pill">${esc(timeKey(next.startTime))}–${esc(timeKey(next.endTime))}</span>
+        ${meta ? `<span class="pill">${esc(meta)}</span>` : ""}
+      </div>
+    </div>
+  `;
 }
