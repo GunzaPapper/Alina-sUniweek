@@ -2,7 +2,6 @@
 /* UniWeek — matte premium pink UI + adaptive day strip + settings mode hides top UI */
 
 :root{
-  color-scheme: light;
   --pink:#F7A8C6;
   --pink-strong:#F48FB8;
   --pink-soft:#FCE3EE;
@@ -95,7 +94,11 @@ a{ color:inherit; }
   align-items:center;
   gap:10px;
 
-  background: rgba(255,247,251,.92);
+  background: linear-gradient(
+    180deg,
+    rgba(255,247,251,0.96),
+    rgba(255,247,251,0.90)
+  );
   border-bottom: 1px solid rgba(247,168,198,.18);
 
   border-bottom-left-radius: 22px;
@@ -686,6 +689,7 @@ a{ color:inherit; }
   .topBar{ max-width: 760px; margin: 0 auto; }
   .bottomTabs{ max-width: 760px; margin: 0 auto; left: 0; right: 0; }
 }
+
 
 
 
