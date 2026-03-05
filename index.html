@@ -2,8 +2,8 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <!-- ✅ anti-zoom (pinch) + safe areas -->
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#F7A8C6" />
 
   <!-- PWA / iOS -->
@@ -17,8 +17,6 @@
 
   <!-- iOS icons -->
   <link rel="apple-touch-icon" href="./icons/icon-180.png" />
-  <link rel="apple-touch-icon" sizes="152x152" href="./icons/icon-152.png" />
-  <link rel="apple-touch-icon" sizes="167x167" href="./icons/icon-167.png" />
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32.png" />
 
   <link rel="stylesheet" href="./styles.css" />
@@ -26,8 +24,9 @@
 
 <body>
   <div class="appRoot" id="appRoot">
+
     <!-- Top bar -->
-    <header class="topBar">
+    <header class="topBar" role="banner">
       <div class="topBar__left">
         <button class="iconBtn" id="dayPrevBtn" type="button" aria-label="Предыдущий день">‹</button>
       </div>
@@ -44,18 +43,18 @@
     </header>
 
     <!-- Day strip -->
-    <section class="dayStripWrap">
-      <div class="dayStrip" id="dayStrip" aria-label="Дни недели"></div>
+    <section class="dayStripShell" aria-label="Дни недели">
+      <div class="dayStrip" id="dayStrip"></div>
+      <div class="dayStripFade dayStripFade--left" aria-hidden="true"></div>
+      <div class="dayStripFade dayStripFade--right" aria-hidden="true"></div>
     </section>
 
     <!-- Main -->
     <main class="main" id="main">
-      <!-- Screens -->
+      <!-- Schedule -->
       <section class="screen screen--active" id="screenSchedule" aria-label="Расписание">
-        <!-- Next lesson -->
         <div class="card card--soft fadeIn" id="nextLessonCard" aria-live="polite"></div>
 
-        <!-- Lessons list -->
         <div class="card fadeIn">
           <div class="cardHeader">
             <div class="cardTitle" id="scheduleTitle">Пары</div>
@@ -65,8 +64,8 @@
         </div>
       </section>
 
+      <!-- Wishes -->
       <section class="screen" id="screenWishes" aria-label="Пожелания">
-        <!-- Wish card -->
         <div class="card fadeIn">
           <div class="cardHeader">
             <div class="cardTitle">Пожелание 💗</div>
@@ -75,7 +74,6 @@
           <div class="wishBox" id="wishBox"></div>
         </div>
 
-        <!-- Games -->
         <div class="card fadeIn">
           <div class="cardHeader">
             <div class="cardTitle">Игры</div>
@@ -97,7 +95,6 @@
           </div>
         </div>
 
-        <!-- Quiz view -->
         <div class="card fadeIn hidden" id="quizCard">
           <div class="cardHeader">
             <button class="chipBtn" id="quizBackBtn" type="button">← Назад</button>
@@ -107,7 +104,6 @@
           <div id="quizRoot"></div>
         </div>
 
-        <!-- Memory view -->
         <div class="card fadeIn hidden" id="memoryCard">
           <div class="cardHeader">
             <button class="chipBtn" id="memoryBackBtn" type="button">← Назад</button>
@@ -118,6 +114,7 @@
         </div>
       </section>
 
+      <!-- Notes -->
       <section class="screen" id="screenNotes" aria-label="Заметки">
         <div class="card fadeIn">
           <div class="cardHeader">
@@ -145,7 +142,7 @@
               <button class="btn btn--secondary" id="notePinBtn" type="button" title="Закрепить">📌</button>
             </div>
 
-            <div class="row">
+            <div class="row row--wrap">
               <select class="input" id="noteColorSelect" aria-label="Цвет заметки">
                 <option value="pink">Розовый</option>
                 <option value="peach">Персик</option>
@@ -166,6 +163,7 @@
         </div>
       </section>
 
+      <!-- Settings -->
       <section class="screen" id="screenSettings" aria-label="Настройки">
         <div class="card fadeIn">
           <div class="cardHeader">
@@ -175,7 +173,7 @@
 
           <div class="settingsGroup">
             <div class="settingsRow">
-              <div>
+              <div class="settingsText">
                 <div class="settingsLabel">Auto-неделя</div>
                 <div class="settingsHint">по ANCHOR_DATE (числ/знам)</div>
               </div>
@@ -186,12 +184,15 @@
             </div>
 
             <div class="settingsRow">
-              <div class="settingsLabel">ANCHOR_DATE</div>
-              <input class="input" id="anchorDateInput" placeholder="YYYY-MM-DD" inputmode="numeric" />
+              <div class="settingsText">
+                <div class="settingsLabel">ANCHOR_DATE</div>
+                <div class="settingsHint">формат: YYYY-MM-DD</div>
+              </div>
+              <input class="input input--compact" id="anchorDateInput" placeholder="YYYY-MM-DD" inputmode="numeric" />
             </div>
 
             <div class="settingsRow" id="manualWeekRow">
-              <div>
+              <div class="settingsText">
                 <div class="settingsLabel">Неделя вручную</div>
                 <div class="settingsHint">если auto выключен</div>
               </div>
@@ -206,7 +207,7 @@
 
           <div class="settingsGroup">
             <div class="settingsRow">
-              <div>
+              <div class="settingsText">
                 <div class="settingsLabel">Импорт CSV</div>
                 <div class="settingsHint">courseName,type,dayOfWeek,startTime,endTime,weekType,location,color</div>
               </div>
@@ -216,13 +217,16 @@
               </label>
             </div>
 
-            <div class="settingsRow">
+            <div class="settingsRow settingsRow--actions">
               <button class="btn btn--secondary" id="exportJsonBtn" type="button">Экспорт данных</button>
               <button class="btn btn--danger" id="resetAllBtn" type="button">Сбросить всё</button>
             </div>
 
             <div class="settingsRow">
-              <div class="settingsLabel">Цвета предметов</div>
+              <div class="settingsText">
+                <div class="settingsLabel">Цвета предметов</div>
+                <div class="settingsHint">можно оставить пустым</div>
+              </div>
             </div>
             <div class="subjectColors" id="subjectColors"></div>
           </div>
@@ -261,7 +265,7 @@
       </div>
     </dialog>
 
-    <!-- Praise overlay (blocks UI) -->
+    <!-- Praise overlay -->
     <div class="overlay hidden" id="praiseOverlay" aria-live="polite" aria-modal="true" role="dialog">
       <div class="overlay__card">
         <div class="overlay__confetti" id="praiseConfetti" aria-hidden="true"></div>
@@ -270,6 +274,7 @@
         <button class="btn overlay__btn" id="praiseCloseBtn" type="button">Продолжить</button>
       </div>
     </div>
+
   </div>
 
   <script type="module" src="./app.js"></script>
