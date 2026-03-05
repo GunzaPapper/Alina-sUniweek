@@ -1,7 +1,7 @@
 // app.js (CORE)
 // Основа: вкладки + верхняя панель/дни + импорт CSV + рендер расписания
 // Никакие второстепенные модули не требуются, чтобы приложение работало.
-
+import { initNotes, openNotes } from "./notes.js";
 import { renderSchedule } from "./schedule.js";
 import { importScheduleFromCsv } from "./csvParser.js";
 
@@ -269,9 +269,13 @@ function renderSubjectColors() {
   Events
 --------------------------- */
 function bindEvents() {
+  initNotes();
   $("#tabSchedule")?.addEventListener("click", () => setScreen("schedule"));
   $("#tabWishes")?.addEventListener("click", () => setScreen("wishes"));
-  $("#tabNotes")?.addEventListener("click", () => setScreen("notes"));
+  $("#tabNotes")?.addEventListener("click", () => {
+  setScreen("notes");
+  openNotes();
+  });
   $("#tabSettings")?.addEventListener("click", () => setScreen("settings"));
 
   $("#dayPrevBtn")?.addEventListener("click", () => {
