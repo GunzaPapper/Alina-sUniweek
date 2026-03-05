@@ -1,46 +1,83 @@
-// app.js (FULL)
-// UniWeek — устойчивый запуск без 404 на модули + базовая логика UI
-// ВАЖНО: этот app.js НЕ импортирует другие js-файлы, чтобы не было 404.
-// Если позже захочешь вернуть модульную структуру — сделаем правильно (везде ./).
+// app.js (FULL, modular-safe)
+// UniWeek — модульный запуск (calendar/notes/quiz/memory/...) с защитой от падений
+// Все файлы лежат рядом с index.html, поэтому пути: ./calendar.js и т.д.
 
-/* -----------------------------
-  Helpers
------------------------------ */
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+const LS = {
+  SCHEDULE: "uniweek_schedule_v1",
+  SUBJECT_COLORS: "uniweek_subject_colors_v1",
+  MANUAL_WEEK: "uniweek_manual_week_v1",
+  AUTO_WEEK: "uniweek_auto_week_v1",
+  ANCHOR_DATE: "uniweek_anchor_date_v1",
+  NOTES: "uniweek_notes_v1",
+};
 
-function safeJsonParse(str, fallback) {
-  try {
-    if (str == null) return fallback;
-    const parsed = JSON.parse(str);
+const state = {
+  screen: "schedule",
+  selectedDate: new Date(),
 
-    // КЛЮЧЕВОЕ: если в storage лежит "null" -> parsed = null -> возвращаем fallback
-    if (parsed == null) return fallback;
+  schedule: [],
+  subjectColors: {},
 
-    return parsed;
-  } catch {
-    return fallback;
+  manualWeek: "odd",
+  autoWeek: true,
+  anchorDate: "",
+
+  // модульные точки
+  mods: {
+    calendar: null,
+    notes: null,
+    quiz: null,
+    memory: null,
+    praise: null,
+    swipe: null,
+    csv: null,
+    schedule: null,
+    nextLesson: null,
+    progress: null,
+    achievements: null,
   }
+};
+
+/* ---------------------------
+  Anti zoom (pinch) + nicer touch
+--------------------------- */
+function disablePinchZoom() {
+  // iOS Safari gestures
+  document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
+  document.addEventListener("gesturechange", (e) => e.preventDefault(), { passive: false });
+  document.addEventListener("gestureend", (e) => e.preventDefault(), { passive: false });
+
+  // prevent ctrl+wheel zoom (desktop)
+  window.addEventListener("wheel", (e) => {
+    if (e.ctrlKey) e.preventDefault();
+  }, { passive: false });
+
+  // prevent double-tap zoom-ish on some browsers
+  let lastTouchEnd = 0;
+  document.addEventListener("touchend", (e) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
 }
 
-function safeArrayFromLS(key, fallback = []) {
-  const v = safeJsonParse(localStorage.getItem(key), fallback);
-  return Array.isArray(v) ? v : fallback;
+/* ---------------------------
+  Utils
+--------------------------- */
+function safeJsonParse(str, fallback) {
+  try { return JSON.parse(str); } catch { return fallback; }
 }
-
-function safeObjectFromLS(key, fallback = {}) {
-  const v = safeJsonParse(localStorage.getItem(key), fallback);
-  // объект, но не массив
-  return v && typeof v === "object" && !Array.isArray(v) ? v : fallback;
+function saveLS(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
 }
-
-function formatTime(t) {
-  // expects "HH:MM"
-  return String(t || "").trim();
+function loadLS(key, fallback) {
+  const raw = localStorage.getItem(key);
+  return raw ? safeJsonParse(raw, fallback) : fallback;
 }
-
+function pad2(n) { return String(n).padStart(2, "0"); }
 function esc(s) {
   return String(s ?? "")
     .replaceAll("&", "&amp;")
@@ -48,127 +85,62 @@ function esc(s) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 }
+function formatTime(t) { return String(t || "").trim(); }
 
-/* -----------------------------
-  Storage keys
------------------------------ */
-const LS = {
-  SCHEDULE: "uniweek_schedule_v1",  // array of lessons
-  SUBJECT_COLORS: "uniweek_subject_colors_v1",
-  MANUAL_WEEK: "uniweek_manual_week_v1", // "odd" | "even"
-  AUTO_WEEK: "uniweek_auto_week_v1", // "1" | "0"
-  ANCHOR_DATE: "uniweek_anchor_date_v1", // "YYYY-MM-DD"
-  NOTES: "uniweek_notes_v1",
-};
-
-/* -----------------------------
-  Defaults (можешь заменить на свои массивы)
------------------------------ */
-const BASE_WISHES = [
-  "Доброе утро, мой цветочек 🌸💗 как ты спала?",
-  "Напоминание на сегодня: я тебя очень сильно люблю 💗",
-  "Ты умничка и красавица 💞",
-];
-
-const PRAISES = [
-  { t:"Ты моя умничка 💗🥰", s:"Так держать! ✨" },
-  { t:"Вау! Ты супер 💖", s:"Я тобой горжусь 😍" },
-];
-
-/* -----------------------------
-  App state
------------------------------ */
-const state = {
-  screen: "schedule", // schedule | wishes | notes | settings
-  selectedDate: new Date(),
-  schedule: [],        // lessons
-  subjectColors: {},   // { [courseName]: color }
-  notes: [],
-  manualWeek: "odd",
-  autoWeek: true,
-  anchorDate: "",
-
-  // anti-repeat wishes
-  wishPool: [],
-  currentWish: "",
-};
-
-/* -----------------------------
+/* ---------------------------
   Week logic
------------------------------ */
-// если autoWeek включен — считаем odd/even относительно ANCHOR_DATE
+--------------------------- */
 function getWeekType(date) {
   if (!state.autoWeek) return state.manualWeek;
 
-  // anchorDate optional; if missing, fallback to manual
-  const a = state.anchorDate?.trim();
+  const a = (state.anchorDate || "").trim();
   if (!a) return state.manualWeek;
 
   const anchor = new Date(a + "T00:00:00");
   if (Number.isNaN(anchor.getTime())) return state.manualWeek;
 
-  // ISO-ish week diff (by Monday)
   const monday = (d) => {
     const x = new Date(d);
     const day = (x.getDay() + 6) % 7; // Mon=0..Sun=6
-    x.setHours(0,0,0,0);
+    x.setHours(0, 0, 0, 0);
     x.setDate(x.getDate() - day);
     return x;
   };
+
   const w0 = monday(anchor).getTime();
   const w1 = monday(date).getTime();
   const diffWeeks = Math.round((w1 - w0) / (7 * 24 * 3600 * 1000));
+
   return (diffWeeks % 2 === 0) ? "odd" : "even";
 }
 
-/* -----------------------------
+/* ---------------------------
   Load / Save
------------------------------ */
+--------------------------- */
 function loadAll() {
-  // КЛЮЧЕВО: даже если в LS лежит "null" или не тот тип — тут всегда будут нормальные структуры
-  state.schedule = safeArrayFromLS(LS.SCHEDULE, []);
-  state.subjectColors = safeObjectFromLS(LS.SUBJECT_COLORS, {});
-  state.notes = safeArrayFromLS(LS.NOTES, []);
+  state.schedule = loadLS(LS.SCHEDULE, []);
+  if (!Array.isArray(state.schedule)) state.schedule = [];
+
+  state.subjectColors = loadLS(LS.SUBJECT_COLORS, {});
+  if (!state.subjectColors || typeof state.subjectColors !== "object") state.subjectColors = {};
 
   state.manualWeek = localStorage.getItem(LS.MANUAL_WEEK) || "odd";
   state.autoWeek = (localStorage.getItem(LS.AUTO_WEEK) ?? "1") === "1";
   state.anchorDate = localStorage.getItem(LS.ANCHOR_DATE) || "";
-
-  // если текущая вкладка "wishes", но пожелания ещё нет — подготовим
-  if (!state.currentWish) {
-    state.currentWish = pickWish();
-  }
 }
 
-function saveSchedule() {
-  localStorage.setItem(LS.SCHEDULE, JSON.stringify(state.schedule));
-}
-function saveColors() {
-  localStorage.setItem(LS.SUBJECT_COLORS, JSON.stringify(state.subjectColors));
-}
 function saveSettings() {
   localStorage.setItem(LS.MANUAL_WEEK, state.manualWeek);
   localStorage.setItem(LS.AUTO_WEEK, state.autoWeek ? "1" : "0");
   localStorage.setItem(LS.ANCHOR_DATE, state.anchorDate);
 }
-function saveNotes() {
-  localStorage.setItem(LS.NOTES, JSON.stringify(state.notes));
-}
 
-/* -----------------------------
-  UI rendering
------------------------------ */
-function renderTopBar() {
-  const monthTitle = $("#monthTitle");
-  const weekSubtitle = $("#weekSubtitle");
-  if (!monthTitle || !weekSubtitle) return;
-
-  const d = state.selectedDate;
-  const month = d.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
-  monthTitle.textContent = month.charAt(0).toUpperCase() + month.slice(1);
-
-  const weekType = getWeekType(d);
-  weekSubtitle.textContent = `Неделя: ${weekType === "odd" ? "Odd (числ)" : "Even (знам)"}`;
+/* ---------------------------
+  UI: Tabs & TopBar
+--------------------------- */
+function setScreen(name) {
+  state.screen = name;
+  renderTabs();
 }
 
 function renderTabs() {
@@ -188,19 +160,82 @@ function renderTabs() {
   }
 }
 
-function lessonMatchesDate(lesson, date) {
-  // lesson: {courseName,type,dayOfWeek,startTime,endTime,weekType,location,color}
-  const dayNames = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
-  const dow = dayNames[date.getDay()];
-  const wt = getWeekType(date); // "odd"/"even"
-  const lt = String(lesson?.weekType || "").toLowerCase().trim();
-  const okWeek = !lt || lt === "any" || lt === wt;
-  const okDay = String(lesson?.dayOfWeek || "").toLowerCase().trim() === dow;
-  return okDay && okWeek;
+function renderTopBar() {
+  const monthTitle = $("#monthTitle");
+  const weekSubtitle = $("#weekSubtitle");
+  if (!monthTitle || !weekSubtitle) return;
+
+  const d = state.selectedDate;
+  const month = d.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  monthTitle.textContent = month.charAt(0).toUpperCase() + month.slice(1);
+
+  const wt = getWeekType(d);
+  weekSubtitle.textContent = `Неделя: ${wt === "odd" ? "Odd (числ)" : "Even (знам)"}`;
 }
 
-function sortByTime(a, b) {
-  return formatTime(a?.startTime).localeCompare(formatTime(b?.startTime));
+/* ---------------------------
+  Day strip (быстрый рендер недели)
+--------------------------- */
+function renderDayStrip() {
+  const strip = $("#dayStrip");
+  if (!strip) return;
+
+  const base = new Date(state.selectedDate);
+  // делаем 7 дней вокруг выбранного (с пн по вс)
+  const day = (base.getDay() + 6) % 7; // Mon=0
+  const monday = new Date(base);
+  monday.setDate(monday.getDate() - day);
+
+  const today = new Date();
+  const isSameDay = (a, b) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    days.push(d);
+  }
+
+  strip.innerHTML = days.map(d => {
+    const active = isSameDay(d, state.selectedDate);
+    const dow = d.toLocaleDateString("ru-RU", { weekday: "short" }).toUpperCase();
+    const ddmm = d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+    const todayMark = isSameDay(d, today) ? `<div class="todayDot">today</div>` : "";
+    return `
+      <button class="dayPill ${active ? "dayPill--active" : ""}" type="button" data-date="${d.toISOString()}">
+        <div class="dayPill__dow">${esc(dow)}</div>
+        <div class="dayPill__date">${esc(ddmm)}</div>
+        ${todayMark}
+      </button>
+    `;
+  }).join("");
+
+  $$(".dayPill", strip).forEach(btn => {
+    btn.addEventListener("click", () => {
+      const iso = btn.getAttribute("data-date");
+      const d = iso ? new Date(iso) : new Date();
+      state.selectedDate = d;
+      renderAll();
+    });
+  });
+}
+
+/* ---------------------------
+  Schedule render (CSS-compatible with твоим styles.css)
+--------------------------- */
+function lessonMatchesDate(lesson, date) {
+  const dayNames = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+  const dow = dayNames[date.getDay()];
+  const wt = getWeekType(date); // odd/even
+  const lt = (lesson.weekType || "").toLowerCase().trim();
+
+  const okWeek = !lt || lt === "any" || lt === wt;
+  const okDay = (lesson.dayOfWeek || "").toLowerCase().trim() === dow;
+
+  return okDay && okWeek;
 }
 
 function renderSchedule() {
@@ -209,16 +244,12 @@ function renderSchedule() {
   const nextCard = $("#nextLessonCard");
   if (!list || !hint || !nextCard) return;
 
-  // ГАРАНТИЯ: schedule всегда массив (из loadAll), но на всякий — страховка
-  const scheduleSafe = Array.isArray(state.schedule) ? state.schedule : [];
-
-  const items = scheduleSafe
-    .filter(l => l && lessonMatchesDate(l, state.selectedDate))
-    .sort(sortByTime);
+  const items = (Array.isArray(state.schedule) ? state.schedule : [])
+    .filter(l => lessonMatchesDate(l, state.selectedDate))
+    .sort((a,b) => formatTime(a.startTime).localeCompare(formatTime(b.startTime)));
 
   hint.textContent = items.length ? `${items.length} шт.` : "Пока пусто — импортируй CSV в Настройках";
 
-  // list
   if (!items.length) {
     list.innerHTML = `
       <div class="empty">
@@ -228,27 +259,30 @@ function renderSchedule() {
     `;
   } else {
     list.innerHTML = items.map(l => {
-      const courseName = l.courseName || "—";
-      const color = l.color || state.subjectColors[courseName] || "#F7A8C6";
-      const type = String(l.type || "").toLowerCase();
-      const icon = type === "lecture" ? "🎓" : type === "seminar" ? "📝" : "📌";
+      const color = l.color || state.subjectColors[l.courseName] || "#F7A8C6";
+      const type = (l.type || "").toLowerCase();
+      const typeLabel = type === "lecture" ? "🎓 Лекция" : type === "seminar" ? "📝 Семинар" : "📌 Занятие";
+
       return `
-        <div class="lesson">
-          <div class="lesson__bar" style="background:${esc(color)}"></div>
-          <div class="lesson__main">
-            <div class="lesson__top">
-              <div class="lesson__time">${esc(formatTime(l.startTime))}–${esc(formatTime(l.endTime))}</div>
-              <div class="lesson__type">${icon}</div>
+        <div class="lessonCard">
+          <div class="lessonStripe" style="background:${esc(color)}"></div>
+          <div class="lessonBody">
+            <div class="lessonTop">
+              <div class="lessonTime">${esc(formatTime(l.startTime))}–${esc(formatTime(l.endTime))}</div>
+              <div class="lessonType">${esc(typeLabel)}</div>
             </div>
-            <div class="lesson__title">${esc(courseName)}</div>
-            <div class="lesson__meta">${esc(l.location || "")}</div>
+            <div class="lessonName">${esc(l.courseName || "—")}</div>
+            <div class="lessonMeta">
+              ${l.location ? `<span class="pill">📍 ${esc(l.location)}</span>` : ""}
+              ${l.weekType ? `<span class="pill">📅 ${esc(l.weekType)}</span>` : ""}
+            </div>
           </div>
         </div>
       `;
     }).join("");
   }
 
-  // next lesson card (today only)
+  // next lesson (today only)
   const now = new Date();
   const sameDay =
     now.getFullYear() === state.selectedDate.getFullYear() &&
@@ -265,7 +299,6 @@ function renderSchedule() {
     return;
   }
 
-  const pad2 = (n) => String(n).padStart(2, "0");
   const cur = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
   const next = items.find(x => formatTime(x.endTime) > cur) || null;
 
@@ -280,42 +313,19 @@ function renderSchedule() {
     nextCard.innerHTML = `
       <div class="nextLesson">
         <div class="nextLesson__title">Следующая пара</div>
-        <div class="nextLesson__big">${esc(next.courseName || "—")}</div>
-        <div class="nextLesson__text">${esc(formatTime(next.startTime))}–${esc(formatTime(next.endTime))} • ${esc(next.location || "")}</div>
+        <div class="nextLesson__row">
+          <div style="font-weight:900">${esc(next.courseName || "—")}</div>
+          <div style="color:rgba(42,31,37,.7); font-weight:800">${esc(formatTime(next.startTime))}–${esc(formatTime(next.endTime))}</div>
+        </div>
+        <div class="nextLesson__text">${esc(next.location || "")}</div>
       </div>
     `;
   }
 }
 
-/* -----------------------------
-  Wishes (без постоянного перескакивания)
------------------------------ */
-function ensureWishPool() {
-  if (!state.wishPool.length) {
-    const arr = BASE_WISHES.slice();
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    state.wishPool = arr;
-  }
-}
-
-function pickWish() {
-  ensureWishPool();
-  return state.wishPool.pop() || "💗";
-}
-
-function renderWish(forceNew = false) {
-  const box = $("#wishBox");
-  if (!box) return;
-
-  if (forceNew || !state.currentWish) {
-    state.currentWish = pickWish();
-  }
-  box.textContent = state.currentWish;
-}
-
+/* ---------------------------
+  Settings UI (базово)
+--------------------------- */
 function renderSettings() {
   const autoToggle = $("#autoWeekToggle");
   const anchorInput = $("#anchorDateInput");
@@ -337,8 +347,7 @@ function renderSubjectColors() {
   const root = $("#subjectColors");
   if (!root) return;
 
-  const scheduleSafe = Array.isArray(state.schedule) ? state.schedule : [];
-  const subjects = Array.from(new Set(scheduleSafe.map(x => x?.courseName).filter(Boolean)))
+  const subjects = Array.from(new Set((state.schedule || []).map(x => x.courseName).filter(Boolean)))
     .sort((a,b)=>a.localeCompare(b,"ru"));
 
   if (!subjects.length) {
@@ -348,100 +357,69 @@ function renderSubjectColors() {
 
   root.innerHTML = subjects.map(name => {
     const val = state.subjectColors[name] || "";
+    // используем твои классы из CSS: subjectColorRow + colorPicker
     return `
-      <div class="colorRow">
-        <div class="colorRow__name">${esc(name)}</div>
-        <input class="input colorRow__input" data-subject="${esc(name)}" value="${esc(val)}" placeholder="#F7A8C6" />
+      <div class="subjectColorRow">
+        <div class="settingsLabel">${esc(name)}</div>
+        <input class="colorPicker" data-subject="${esc(name)}" value="${esc(val)}" placeholder="#F7A8C6" />
       </div>
     `;
   }).join("");
 
-  $$(".colorRow__input", root).forEach(inp => {
+  $$(".colorPicker", root).forEach(inp => {
     inp.addEventListener("change", () => {
       const subject = inp.getAttribute("data-subject");
       const v = inp.value.trim();
       if (!subject) return;
       if (!v) delete state.subjectColors[subject];
       else state.subjectColors[subject] = v;
-      saveColors();
+      saveLS(LS.SUBJECT_COLORS, state.subjectColors);
       renderSchedule();
     });
   });
 }
 
-/* -----------------------------
-  CSV Import (минимально рабочий)
-  expected columns:
-  courseName,type,dayOfWeek,startTime,endTime,weekType,location,color
------------------------------ */
-function parseCsv(text) {
-  const rows = [];
-  let cur = "", inQ = false;
-  const out = [];
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    const next = text[i + 1];
-    if (ch === '"' && next === '"') { cur += '"'; i++; continue; }
-    if (ch === '"') { inQ = !inQ; continue; }
-    if (ch === "," && !inQ) { out.push(cur); cur = ""; continue; }
-    if ((ch === "\n" || ch === "\r") && !inQ) {
-      if (ch === "\r" && next === "\n") i++;
-      out.push(cur); cur = "";
-      rows.push(out.slice());
-      out.length = 0;
-      continue;
-    }
-    cur += ch;
+/* ---------------------------
+  Modular loader (динамические импорты)
+--------------------------- */
+async function tryImport(path, key) {
+  try {
+    const mod = await import(path);
+    state.mods[key] = mod;
+    return mod;
+  } catch (e) {
+    console.warn(`[UniWeek] Module failed: ${path}`, e);
+    state.mods[key] = null;
+    return null;
   }
-  if (cur.length || out.length) { out.push(cur); rows.push(out.slice()); }
-  return rows.filter(r => r.some(c => String(c).trim() !== ""));
 }
 
-function importScheduleFromCsv(csvText) {
-  const rows = parseCsv(csvText);
-  if (!rows.length) return { ok:false, msg:"CSV пустой" };
-
-  const header = rows[0].map(x => String(x).trim());
-  const idx = (name) => header.indexOf(name);
-
-  const needed = ["courseName","type","dayOfWeek","startTime","endTime","weekType","location","color"];
-  for (const k of needed) {
-    if (idx(k) === -1) return { ok:false, msg:`Нет колонки: ${k}` };
-  }
-
-  const lessons = [];
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
-    const get = (k) => (r[idx(k)] ?? "").toString().trim();
-    const courseName = get("courseName");
-    if (!courseName) continue;
-
-    lessons.push({
-      courseName,
-      type: get("type"),
-      dayOfWeek: get("dayOfWeek").toLowerCase(),
-      startTime: get("startTime"),
-      endTime: get("endTime"),
-      weekType: get("weekType").toLowerCase(),
-      location: get("location"),
-      color: get("color"),
-    });
-  }
-
-  state.schedule = lessons;
-  saveSchedule();
-  return { ok:true, msg:`Импортировано: ${lessons.length}` };
+async function loadModules() {
+  // грузим все, но приложение не падает если что-то не так
+  await Promise.all([
+    tryImport("./calendar.js", "calendar"),
+    tryImport("./notes.js", "notes"),
+    tryImport("./quiz.js", "quiz"),
+    tryImport("./memory.js", "memory"),
+    tryImport("./praise.js", "praise"),
+    tryImport("./swipe.js", "swipe"),
+    tryImport("./csvParser.js", "csv"),
+    tryImport("./schedule.js", "schedule"),
+    tryImport("./nextLesson.js", "nextLesson"),
+    tryImport("./progress.js", "progress"),
+    tryImport("./achievements.js", "achievements"),
+  ]);
 }
 
-/* -----------------------------
-  Navigation / events
------------------------------ */
+/* ---------------------------
+  Events
+--------------------------- */
 function bindEvents() {
   // tabs
-  $("#tabSchedule")?.addEventListener("click", () => { state.screen="schedule"; renderAll(); });
-  $("#tabWishes")?.addEventListener("click", () => { state.screen="wishes"; renderAll(); });
-  $("#tabNotes")?.addEventListener("click", () => { state.screen="notes"; renderAll(); });
-  $("#tabSettings")?.addEventListener("click", () => { state.screen="settings"; renderAll(); });
+  $("#tabSchedule")?.addEventListener("click", () => { setScreen("schedule"); });
+  $("#tabWishes")?.addEventListener("click", () => { setScreen("wishes"); });
+  $("#tabNotes")?.addEventListener("click", () => { setScreen("notes"); });
+  $("#tabSettings")?.addEventListener("click", () => { setScreen("settings"); renderSettings(); });
 
   // day arrows
   $("#dayPrevBtn")?.addEventListener("click", () => {
@@ -457,9 +435,6 @@ function bindEvents() {
     renderAll();
   });
 
-  // wish
-  $("#wishMoreBtn")?.addEventListener("click", () => renderWish(true));
-
   // settings: autoWeek toggle
   $("#autoWeekToggle")?.addEventListener("change", (e) => {
     state.autoWeek = !!e.target.checked;
@@ -474,7 +449,7 @@ function bindEvents() {
     renderAll();
   });
 
-  // manual week buttons
+  // manual week
   $("#weekOddBtn")?.addEventListener("click", () => {
     state.manualWeek = "odd";
     saveSettings();
@@ -486,15 +461,27 @@ function bindEvents() {
     renderAll();
   });
 
-  // CSV import
+  // CSV import: если есть модуль csvParser — используем его, иначе fallback (сделаем в следующем файле)
   $("#csvInput")?.addEventListener("change", async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
 
     try {
       const text = await f.text();
-      const res = importScheduleFromCsv(text);
-      alert(res.msg);
+
+      // ожидаем, что csvParser.js экспортирует: importScheduleFromCsv(text) -> {ok,msg,lessons}
+      const csv = state.mods.csv;
+      if (csv?.importScheduleFromCsv) {
+        const res = csv.importScheduleFromCsv(text);
+        if (res?.ok && Array.isArray(res.lessons)) {
+          state.schedule = res.lessons;
+          saveLS(LS.SCHEDULE, state.schedule);
+        }
+        alert(res?.msg || "Импорт завершён");
+      } else {
+        alert("csvParser.js ещё не подключён/пустой. Сейчас я дам его следующим файлом ✅");
+      }
+
       renderAll();
     } catch (err) {
       alert("Ошибка чтения файла: " + (err?.message || err));
@@ -511,10 +498,9 @@ function bindEvents() {
       manualWeek: state.manualWeek,
       autoWeek: state.autoWeek,
       anchorDate: state.anchorDate,
-      notes: state.notes,
       exportedAt: new Date().toISOString()
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type:"application/json" });
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -532,40 +518,79 @@ function bindEvents() {
     loadAll();
     renderAll();
   });
+
+  // open calendar modal (если модуль будет)
+  $("#calendarOpenBtn")?.addEventListener("click", () => {
+    const dlg = $("#calendarModal");
+    if (!dlg) return;
+    dlg.showModal?.();
+    // если модуль calendar есть — пусть отрендерит
+    state.mods.calendar?.openCalendar?.({ state, onPickDate: (d) => {
+      state.selectedDate = d;
+      dlg.close?.();
+      renderAll();
+    }});
+  });
+  $("#calendarCloseBtn")?.addEventListener("click", () => {
+    $("#calendarModal")?.close?.();
+  });
+
+  // games buttons
+  $("#openQuizBtn")?.addEventListener("click", () => {
+    $("#quizCard")?.classList.remove("hidden");
+    $("#memoryCard")?.classList.add("hidden");
+    state.mods.quiz?.openQuiz?.({ state });
+  });
+  $("#openMemoryBtn")?.addEventListener("click", () => {
+    $("#memoryCard")?.classList.remove("hidden");
+    $("#quizCard")?.classList.add("hidden");
+    state.mods.memory?.openMemory?.({ state });
+  });
+  $("#quizBackBtn")?.addEventListener("click", () => {
+    $("#quizCard")?.classList.add("hidden");
+  });
+  $("#memoryBackBtn")?.addEventListener("click", () => {
+    $("#memoryCard")?.classList.add("hidden");
+  });
+
+  // notes screen init
+  $("#tabNotes")?.addEventListener("click", () => {
+    state.mods.notes?.openNotes?.({ state });
+  });
 }
 
-/* -----------------------------
+/* ---------------------------
   Render all
------------------------------ */
+--------------------------- */
 function renderAll() {
   renderTopBar();
   renderTabs();
+  renderDayStrip();
   renderSchedule();
 
-  if (state.screen === "wishes") renderWish(false);
   if (state.screen === "settings") renderSettings();
+
+  // пусть модули тоже обновятся, если они умеют
+  state.mods.progress?.renderProgress?.({ state });
+  state.mods.achievements?.renderAchievements?.({ state });
 }
 
-/* -----------------------------
-  Service worker (safe)
------------------------------ */
+/* ---------------------------
+  SW register
+--------------------------- */
 async function registerSW() {
-  // ВАЖНО: sw.js должен лежать рядом с index.html
   if (!("serviceWorker" in navigator)) return;
-
   try {
-    // на file:// сервис-воркер не работает
     if (location.protocol === "file:") return;
-
     await navigator.serviceWorker.register("./sw.js", { scope: "./" });
   } catch (e) {
     console.warn("SW register failed:", e);
   }
 }
 
-/* -----------------------------
+/* ---------------------------
   Boot
------------------------------ */
+--------------------------- */
 function showFatal(err) {
   const card = $("#nextLessonCard");
   if (card) {
@@ -573,16 +598,22 @@ function showFatal(err) {
       <div class="nextLesson">
         <div class="nextLesson__title">Ошибка запуска</div>
         <div class="nextLesson__text">${esc(err?.message || err)}</div>
-        <div class="nextLesson__text">Открой DevTools → Console и пришли мне красные строки.</div>
+        <div class="nextLesson__text">Открой DevTools → Console и пришли красные строки.</div>
       </div>
     `;
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   try {
+    disablePinchZoom();
     loadAll();
+    await loadModules();     // важно: модули подгрузятся, но не уронят app
     bindEvents();
+
+    // если модуль swipe есть — пусть подключит свайпы между днями/экранами
+    state.mods.swipe?.initSwipe?.({ state, onChange: renderAll });
+
     renderAll();
     registerSW();
   } catch (err) {
