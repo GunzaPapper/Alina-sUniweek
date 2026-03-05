@@ -775,3 +775,39 @@ a{ color:inherit; }
   .dayPill{ min-width: 86px; }
   .tab__label{ font-size: 10px; }
 }
+
+/* ==== HOTFIX: Bottom tabs always 4 columns and centered ==== */
+.bottomTabs{
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+
+  padding: 10px !important;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-left: calc(10px + env(safe-area-inset-left, 0px)) !important;
+  padding-right: calc(10px + env(safe-area-inset-right, 0px)) !important;
+
+  box-sizing: border-box !important;
+  z-index: 9999 !important;
+
+  background: linear-gradient(180deg, rgba(255,247,251,.58), rgba(255,247,251,.92)) !important;
+  border-top: 1px solid rgba(247,168,198,.16) !important;
+  backdrop-filter: blur(18px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(140%) !important;
+}
+
+.bottomTabs .tab{
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.main{
+  padding-bottom: 110px !important; /* чтобы контент не залезал под табы */
+}
+
