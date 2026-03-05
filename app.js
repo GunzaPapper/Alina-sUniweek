@@ -615,9 +615,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.mods.swipe?.initSwipe?.({ state, onChange: renderAll });
 
     renderAll();
-    registerSW();
+    // registerSW();
   } catch (err) {
     console.error(err);
     showFatal(err);
   }
 });
+
