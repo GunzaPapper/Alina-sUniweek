@@ -141,6 +141,7 @@ a{ color:inherit; }
   -webkit-tap-highlight-color: transparent;
   transition: transform var(--tap) ease, opacity var(--tap) ease;
   touch-action: manipulation;
+  aspect-ratio:1/1;
 }
 .iconBtn:active{ transform: scale(.97); opacity:.92; }
 
@@ -684,6 +685,7 @@ a{ color:inherit; }
   .topBar{ max-width: 760px; margin: 0 auto; }
   .bottomTabs{ max-width: 760px; margin: 0 auto; left: 0; right: 0; }
 }
+
 
 
 
