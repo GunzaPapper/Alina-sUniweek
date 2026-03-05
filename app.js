@@ -1,7 +1,7 @@
 // app.js (FULL)
 // UniWeek — устойчивый запуск без 404 на модули + базовая логика UI
 // ВАЖНО: этот app.js НЕ импортирует другие js-файлы, чтобы не было 404.
-// Если позже захочешь вернуть модульную структуру — сделаем, но правильно (везде ./).
+// Если позже захочешь вернуть модульную структуру — сделаем правильно (везде ./).
 
 /* -----------------------------
   Helpers
@@ -12,7 +12,28 @@ const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
 function safeJsonParse(str, fallback) {
-  try { return JSON.parse(str); } catch { return fallback; }
+  try {
+    if (str == null) return fallback;
+    const parsed = JSON.parse(str);
+
+    // КЛЮЧЕВОЕ: если в storage лежит "null" -> parsed = null -> возвращаем fallback
+    if (parsed == null) return fallback;
+
+    return parsed;
+  } catch {
+    return fallback;
+  }
+}
+
+function safeArrayFromLS(key, fallback = []) {
+  const v = safeJsonParse(localStorage.getItem(key), fallback);
+  return Array.isArray(v) ? v : fallback;
+}
+
+function safeObjectFromLS(key, fallback = {}) {
+  const v = safeJsonParse(localStorage.getItem(key), fallback);
+  // объект, но не массив
+  return v && typeof v === "object" && !Array.isArray(v) ? v : fallback;
 }
 
 function formatTime(t) {
@@ -69,6 +90,7 @@ const state = {
 
   // anti-repeat wishes
   wishPool: [],
+  currentWish: "",
 };
 
 /* -----------------------------
@@ -103,13 +125,19 @@ function getWeekType(date) {
   Load / Save
 ----------------------------- */
 function loadAll() {
-  state.schedule = safeJsonParse(localStorage.getItem(LS.SCHEDULE), []);
-  state.subjectColors = safeJsonParse(localStorage.getItem(LS.SUBJECT_COLORS), {});
-  state.notes = safeJsonParse(localStorage.getItem(LS.NOTES), []);
+  // КЛЮЧЕВО: даже если в LS лежит "null" или не тот тип — тут всегда будут нормальные структуры
+  state.schedule = safeArrayFromLS(LS.SCHEDULE, []);
+  state.subjectColors = safeObjectFromLS(LS.SUBJECT_COLORS, {});
+  state.notes = safeArrayFromLS(LS.NOTES, []);
 
   state.manualWeek = localStorage.getItem(LS.MANUAL_WEEK) || "odd";
   state.autoWeek = (localStorage.getItem(LS.AUTO_WEEK) ?? "1") === "1";
   state.anchorDate = localStorage.getItem(LS.ANCHOR_DATE) || "";
+
+  // если текущая вкладка "wishes", но пожелания ещё нет — подготовим
+  if (!state.currentWish) {
+    state.currentWish = pickWish();
+  }
 }
 
 function saveSchedule() {
@@ -165,14 +193,14 @@ function lessonMatchesDate(lesson, date) {
   const dayNames = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
   const dow = dayNames[date.getDay()];
   const wt = getWeekType(date); // "odd"/"even"
-  const lt = (lesson.weekType || "").toLowerCase().trim();
+  const lt = String(lesson?.weekType || "").toLowerCase().trim();
   const okWeek = !lt || lt === "any" || lt === wt;
-  const okDay = (lesson.dayOfWeek || "").toLowerCase().trim() === dow;
+  const okDay = String(lesson?.dayOfWeek || "").toLowerCase().trim() === dow;
   return okDay && okWeek;
 }
 
 function sortByTime(a, b) {
-  return formatTime(a.startTime).localeCompare(formatTime(b.startTime));
+  return formatTime(a?.startTime).localeCompare(formatTime(b?.startTime));
 }
 
 function renderSchedule() {
@@ -181,8 +209,11 @@ function renderSchedule() {
   const nextCard = $("#nextLessonCard");
   if (!list || !hint || !nextCard) return;
 
-  const items = state.schedule
-    .filter(l => lessonMatchesDate(l, state.selectedDate))
+  // ГАРАНТИЯ: schedule всегда массив (из loadAll), но на всякий — страховка
+  const scheduleSafe = Array.isArray(state.schedule) ? state.schedule : [];
+
+  const items = scheduleSafe
+    .filter(l => l && lessonMatchesDate(l, state.selectedDate))
     .sort(sortByTime);
 
   hint.textContent = items.length ? `${items.length} шт.` : "Пока пусто — импортируй CSV в Настройках";
@@ -197,8 +228,9 @@ function renderSchedule() {
     `;
   } else {
     list.innerHTML = items.map(l => {
-      const color = l.color || state.subjectColors[l.courseName] || "#F7A8C6";
-      const type = (l.type || "").toLowerCase();
+      const courseName = l.courseName || "—";
+      const color = l.color || state.subjectColors[courseName] || "#F7A8C6";
+      const type = String(l.type || "").toLowerCase();
       const icon = type === "lecture" ? "🎓" : type === "seminar" ? "📝" : "📌";
       return `
         <div class="lesson">
@@ -208,7 +240,7 @@ function renderSchedule() {
               <div class="lesson__time">${esc(formatTime(l.startTime))}–${esc(formatTime(l.endTime))}</div>
               <div class="lesson__type">${icon}</div>
             </div>
-            <div class="lesson__title">${esc(l.courseName || "—")}</div>
+            <div class="lesson__title">${esc(courseName)}</div>
             <div class="lesson__meta">${esc(l.location || "")}</div>
           </div>
         </div>
@@ -255,9 +287,11 @@ function renderSchedule() {
   }
 }
 
+/* -----------------------------
+  Wishes (без постоянного перескакивания)
+----------------------------- */
 function ensureWishPool() {
   if (!state.wishPool.length) {
-    // новый пул в случайном порядке
     const arr = BASE_WISHES.slice();
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -267,13 +301,19 @@ function ensureWishPool() {
   }
 }
 
-function renderWish() {
+function pickWish() {
+  ensureWishPool();
+  return state.wishPool.pop() || "💗";
+}
+
+function renderWish(forceNew = false) {
   const box = $("#wishBox");
   if (!box) return;
 
-  ensureWishPool();
-  const text = state.wishPool.pop() || "💗";
-  box.textContent = text;
+  if (forceNew || !state.currentWish) {
+    state.currentWish = pickWish();
+  }
+  box.textContent = state.currentWish;
 }
 
 function renderSettings() {
@@ -297,7 +337,10 @@ function renderSubjectColors() {
   const root = $("#subjectColors");
   if (!root) return;
 
-  const subjects = Array.from(new Set(state.schedule.map(x => x.courseName).filter(Boolean))).sort((a,b)=>a.localeCompare(b,"ru"));
+  const scheduleSafe = Array.isArray(state.schedule) ? state.schedule : [];
+  const subjects = Array.from(new Set(scheduleSafe.map(x => x?.courseName).filter(Boolean)))
+    .sort((a,b)=>a.localeCompare(b,"ru"));
+
   if (!subjects.length) {
     root.innerHTML = `<div class="empty__text">Появится после импорта расписания 💗</div>`;
     return;
@@ -332,7 +375,6 @@ function renderSubjectColors() {
   courseName,type,dayOfWeek,startTime,endTime,weekType,location,color
 ----------------------------- */
 function parseCsv(text) {
-  // простой CSV: поддержка кавычек "..."
   const rows = [];
   let cur = "", inQ = false;
   const out = [];
@@ -373,6 +415,7 @@ function importScheduleFromCsv(csvText) {
     const get = (k) => (r[idx(k)] ?? "").toString().trim();
     const courseName = get("courseName");
     if (!courseName) continue;
+
     lessons.push({
       courseName,
       type: get("type"),
@@ -415,7 +458,7 @@ function bindEvents() {
   });
 
   // wish
-  $("#wishMoreBtn")?.addEventListener("click", () => renderWish());
+  $("#wishMoreBtn")?.addEventListener("click", () => renderWish(true));
 
   // settings: autoWeek toggle
   $("#autoWeekToggle")?.addEventListener("change", (e) => {
@@ -498,7 +541,8 @@ function renderAll() {
   renderTopBar();
   renderTabs();
   renderSchedule();
-  if (state.screen === "wishes") renderWish();
+
+  if (state.screen === "wishes") renderWish(false);
   if (state.screen === "settings") renderSettings();
 }
 
@@ -515,7 +559,6 @@ async function registerSW() {
 
     await navigator.serviceWorker.register("./sw.js", { scope: "./" });
   } catch (e) {
-    // не ломаем приложение, просто выводим в консоль
     console.warn("SW register failed:", e);
   }
 }
@@ -524,7 +567,6 @@ async function registerSW() {
   Boot
 ----------------------------- */
 function showFatal(err) {
-  // если что-то прям упало — покажем текст хотя бы в карточке
   const card = $("#nextLessonCard");
   if (card) {
     card.innerHTML = `
