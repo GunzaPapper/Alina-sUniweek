@@ -163,16 +163,18 @@ if (appRoot) appRoot.classList.toggle("settingsMode", state.screen === "settings
 }
 
 function renderTopBar() {
-  const monthTitle = $("#monthTitle");
-  const weekSubtitle = $("#weekSubtitle");
+  const monthTitle = document.getElementById("monthTitle");
+  const weekSubtitle = document.getElementById("weekSubtitle");
+
   if (!monthTitle || !weekSubtitle) return;
 
-  const d = state.selectedDate;
-  const month = d.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
-  monthTitle.textContent = month.charAt(0).toUpperCase() + month.slice(1);
+  monthTitle.textContent = "Alina's UniWeek 💗";
 
-  const wt = getWeekType(d);
-  weekSubtitle.textContent = `Неделя: ${wt === "odd" ? "Odd (числ)" : "Even (знам)"}`;
+  const weekType = getWeekType(state.selectedDate);
+  weekSubtitle.textContent =
+    weekType === "odd"
+      ? "Неделя: числитель"
+      : "Неделя: знаменатель";
 }
 
 /* ---------------------------
@@ -623,5 +625,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     showFatal(err);
   }
 });
+
 
 
