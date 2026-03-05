@@ -1,6 +1,9 @@
-// app.js (FULL, modular-safe)
-// UniWeek — модульный запуск (calendar/notes/quiz/memory/...) с защитой от падений
-// Все файлы лежат рядом с index.html, поэтому пути: ./calendar.js и т.д.
+// FILE: app.js (CORE)
+// Основная логика: вкладки, неделя odd/even, дни сверху, расписание, импорт CSV, настройки.
+// Игры/заметки/календарь — пока заглушки, мы подключим “второстепенные” файлы позже.
+
+import { importScheduleFromCsv } from "./csvParser.js";
+import { renderSchedule } from "./schedule.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -11,7 +14,6 @@ const LS = {
   MANUAL_WEEK: "uniweek_manual_week_v1",
   AUTO_WEEK: "uniweek_auto_week_v1",
   ANCHOR_DATE: "uniweek_anchor_date_v1",
-  NOTES: "uniweek_notes_v1",
 };
 
 const state = {
@@ -24,58 +26,17 @@ const state = {
   manualWeek: "odd",
   autoWeek: true,
   anchorDate: "",
-
-  // модульные точки
-  mods: {
-    calendar: null,
-    notes: null,
-    quiz: null,
-    memory: null,
-    praise: null,
-    swipe: null,
-    csv: null,
-    schedule: null,
-    nextLesson: null,
-    progress: null,
-    achievements: null,
-  }
 };
 
-/* ---------------------------
-  Anti zoom (pinch) + nicer touch
---------------------------- */
-function disablePinchZoom() {
-  // iOS Safari gestures
-  document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
-  document.addEventListener("gesturechange", (e) => e.preventDefault(), { passive: false });
-  document.addEventListener("gestureend", (e) => e.preventDefault(), { passive: false });
-
-  // prevent ctrl+wheel zoom (desktop)
-  window.addEventListener("wheel", (e) => {
-    if (e.ctrlKey) e.preventDefault();
-  }, { passive: false });
-
-  // prevent double-tap zoom-ish on some browsers
-  let lastTouchEnd = 0;
-  document.addEventListener("touchend", (e) => {
-    const now = Date.now();
-    if (now - lastTouchEnd <= 300) e.preventDefault();
-    lastTouchEnd = now;
-  }, { passive: false });
-}
-
-/* ---------------------------
-  Utils
---------------------------- */
 function safeJsonParse(str, fallback) {
   try { return JSON.parse(str); } catch { return fallback; }
-}
-function saveLS(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
 }
 function loadLS(key, fallback) {
   const raw = localStorage.getItem(key);
   return raw ? safeJsonParse(raw, fallback) : fallback;
+}
+function saveLS(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
 }
 function pad2(n) { return String(n).padStart(2, "0"); }
 function esc(s) {
@@ -85,7 +46,26 @@ function esc(s) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 }
-function formatTime(t) { return String(t || "").trim(); }
+
+/* ---------------------------
+  Anti zoom (pinch) + ctrl-wheel
+--------------------------- */
+function disablePinchZoom() {
+  document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
+  document.addEventListener("gesturechange", (e) => e.preventDefault(), { passive: false });
+  document.addEventListener("gestureend", (e) => e.preventDefault(), { passive: false });
+
+  window.addEventListener("wheel", (e) => {
+    if (e.ctrlKey) e.preventDefault();
+  }, { passive: false });
+
+  let lastTouchEnd = 0;
+  document.addEventListener("touchend", (e) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+}
 
 /* ---------------------------
   Week logic
@@ -101,7 +81,7 @@ function getWeekType(date) {
 
   const monday = (d) => {
     const x = new Date(d);
-    const day = (x.getDay() + 6) % 7; // Mon=0..Sun=6
+    const day = (x.getDay() + 6) % 7; // Mon=0
     x.setHours(0, 0, 0, 0);
     x.setDate(x.getDate() - day);
     return x;
@@ -110,7 +90,6 @@ function getWeekType(date) {
   const w0 = monday(anchor).getTime();
   const w1 = monday(date).getTime();
   const diffWeeks = Math.round((w1 - w0) / (7 * 24 * 3600 * 1000));
-
   return (diffWeeks % 2 === 0) ? "odd" : "even";
 }
 
@@ -136,11 +115,14 @@ function saveSettings() {
 }
 
 /* ---------------------------
-  UI: Tabs & TopBar
+  UI helpers
 --------------------------- */
 function setScreen(name) {
   state.screen = name;
   renderTabs();
+  renderTopBar();
+  renderDayStrip();
+  renderMain();
 }
 
 function renderTabs() {
@@ -158,34 +140,27 @@ function renderTabs() {
     tab.classList.toggle("tab--active", state.screen === k);
     screen.classList.toggle("screen--active", state.screen === k);
   }
-  const appRoot = document.getElementById("appRoot");
-if (appRoot) appRoot.classList.toggle("settingsMode", state.screen === "settings");
+
+  const appRoot = $("#appRoot");
+  if (appRoot) appRoot.classList.toggle("settingsMode", state.screen === "settings");
 }
 
 function renderTopBar() {
-  const monthTitle = document.getElementById("monthTitle");
-  const weekSubtitle = document.getElementById("weekSubtitle");
+  const monthTitle = $("#monthTitle");
+  const weekSubtitle = $("#weekSubtitle");
+  if (monthTitle) monthTitle.textContent = "Alina's UniWeek 💗";
 
-  if (!monthTitle || !weekSubtitle) return;
-
-  monthTitle.textContent = "Alina's UniWeek 💗";
-
-  const weekType = getWeekType(state.selectedDate);
-  weekSubtitle.textContent =
-    weekType === "odd"
-      ? "Неделя: числитель"
-      : "Неделя: знаменатель";
+  if (weekSubtitle) {
+    const wt = getWeekType(state.selectedDate);
+    weekSubtitle.textContent = (wt === "odd") ? "Неделя: числитель" : "Неделя: знаменатель";
+  }
 }
 
-/* ---------------------------
-  Day strip (быстрый рендер недели)
---------------------------- */
 function renderDayStrip() {
   const strip = $("#dayStrip");
   if (!strip) return;
 
   const base = new Date(state.selectedDate);
-  // делаем 7 дней вокруг выбранного (с пн по вс)
   const day = (base.getDay() + 6) % 7; // Mon=0
   const monday = new Date(base);
   monday.setDate(monday.getDate() - day);
@@ -220,116 +195,49 @@ function renderDayStrip() {
   $$(".dayPill", strip).forEach(btn => {
     btn.addEventListener("click", () => {
       const iso = btn.getAttribute("data-date");
-      const d = iso ? new Date(iso) : new Date();
-      state.selectedDate = d;
-      renderAll();
+      state.selectedDate = iso ? new Date(iso) : new Date();
+      renderMain();
+      renderTopBar();
+      renderDayStrip();
     });
   });
 }
 
-/* ---------------------------
-  Schedule render (CSS-compatible with твоим styles.css)
---------------------------- */
-function lessonMatchesDate(lesson, date) {
-  const dayNames = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
-  const dow = dayNames[date.getDay()];
-  const wt = getWeekType(date); // odd/even
-  const lt = (lesson.weekType || "").toLowerCase().trim();
+function renderSubjectColors() {
+  const root = $("#subjectColors");
+  if (!root) return;
 
-  const okWeek = !lt || lt === "any" || lt === wt;
-  const okDay = (lesson.dayOfWeek || "").toLowerCase().trim() === dow;
+  const subjects = Array.from(new Set((state.schedule || []).map(x => x.courseName).filter(Boolean)))
+    .sort((a,b)=>a.localeCompare(b,"ru"));
 
-  return okDay && okWeek;
-}
-
-function renderSchedule() {
-  const list = $("#lessonList");
-  const hint = $("#scheduleHint");
-  const nextCard = $("#nextLessonCard");
-  if (!list || !hint || !nextCard) return;
-
-  const items = (Array.isArray(state.schedule) ? state.schedule : [])
-    .filter(l => lessonMatchesDate(l, state.selectedDate))
-    .sort((a,b) => formatTime(a.startTime).localeCompare(formatTime(b.startTime)));
-
-  hint.textContent = items.length ? `${items.length} шт.` : "Пока пусто — импортируй CSV в Настройках";
-
-  if (!items.length) {
-    list.innerHTML = `
-      <div class="empty">
-        <div class="empty__title">Пока нет пар на этот день 💗</div>
-        <div class="empty__text">Зайди в «Настройки» → «Импорт CSV» и выбери файл расписания.</div>
-      </div>
-    `;
-  } else {
-    list.innerHTML = items.map(l => {
-      const color = l.color || state.subjectColors[l.courseName] || "#F7A8C6";
-      const type = (l.type || "").toLowerCase();
-      const typeLabel = type === "lecture" ? "🎓 Лекция" : type === "seminar" ? "📝 Семинар" : "📌 Занятие";
-
-      return `
-        <div class="lessonCard">
-          <div class="lessonStripe" style="background:${esc(color)}"></div>
-          <div class="lessonBody">
-            <div class="lessonTop">
-              <div class="lessonTime">${esc(formatTime(l.startTime))}–${esc(formatTime(l.endTime))}</div>
-              <div class="lessonType">${esc(typeLabel)}</div>
-            </div>
-            <div class="lessonName">${esc(l.courseName || "—")}</div>
-            <div class="lessonMeta">
-              ${l.location ? `<span class="pill">📍 ${esc(l.location)}</span>` : ""}
-              ${l.weekType ? `<span class="pill">📅 ${esc(l.weekType)}</span>` : ""}
-            </div>
-          </div>
-        </div>
-      `;
-    }).join("");
-  }
-
-  // next lesson (today only)
-  const now = new Date();
-  const sameDay =
-    now.getFullYear() === state.selectedDate.getFullYear() &&
-    now.getMonth() === state.selectedDate.getMonth() &&
-    now.getDate() === state.selectedDate.getDate();
-
-  if (!sameDay || !items.length) {
-    nextCard.innerHTML = `
-      <div class="nextLesson">
-        <div class="nextLesson__title">Следующая пара</div>
-        <div class="nextLesson__text">${sameDay ? "Сегодня пар нет 💗" : "Выбери сегодняшний день, чтобы увидеть следующую пару"}</div>
-      </div>
-    `;
+  if (!subjects.length) {
+    root.innerHTML = `<div class="empty__text">Появится после импорта расписания 💗</div>`;
     return;
   }
 
-  const cur = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
-  const next = items.find(x => formatTime(x.endTime) > cur) || null;
+  root.innerHTML = subjects.map(name => {
+    const val = state.subjectColors[name] || "";
+    return `
+      <div class="subjectColorRow">
+        <div class="settingsLabel">${esc(name)}</div>
+        <input class="colorPicker" data-subject="${esc(name)}" value="${esc(val)}" placeholder="#F7A8C6" />
+      </div>
+    `;
+  }).join("");
 
-  if (!next) {
-    nextCard.innerHTML = `
-      <div class="nextLesson">
-        <div class="nextLesson__title">Следующая пара</div>
-        <div class="nextLesson__text">На сегодня всё 💗</div>
-      </div>
-    `;
-  } else {
-    nextCard.innerHTML = `
-      <div class="nextLesson">
-        <div class="nextLesson__title">Следующая пара</div>
-        <div class="nextLesson__row">
-          <div style="font-weight:900">${esc(next.courseName || "—")}</div>
-          <div style="color:rgba(42,31,37,.7); font-weight:800">${esc(formatTime(next.startTime))}–${esc(formatTime(next.endTime))}</div>
-        </div>
-        <div class="nextLesson__text">${esc(next.location || "")}</div>
-      </div>
-    `;
-  }
+  $$(".colorPicker", root).forEach(inp => {
+    inp.addEventListener("change", () => {
+      const subject = inp.getAttribute("data-subject");
+      const v = (inp.value || "").trim();
+      if (!subject) return;
+      if (!v) delete state.subjectColors[subject];
+      else state.subjectColors[subject] = v;
+      saveLS(LS.SUBJECT_COLORS, state.subjectColors);
+      renderMain();
+    });
+  });
 }
 
-/* ---------------------------
-  Settings UI (базово)
---------------------------- */
 function renderSettings() {
   const autoToggle = $("#autoWeekToggle");
   const anchorInput = $("#anchorDateInput");
@@ -347,146 +255,86 @@ function renderSettings() {
   renderSubjectColors();
 }
 
-function renderSubjectColors() {
-  const root = $("#subjectColors");
-  if (!root) return;
-
-  const subjects = Array.from(new Set((state.schedule || []).map(x => x.courseName).filter(Boolean)))
-    .sort((a,b)=>a.localeCompare(b,"ru"));
-
-  if (!subjects.length) {
-    root.innerHTML = `<div class="empty__text">Появится после импорта расписания 💗</div>`;
-    return;
-  }
-
-  root.innerHTML = subjects.map(name => {
-    const val = state.subjectColors[name] || "";
-    // используем твои классы из CSS: subjectColorRow + colorPicker
-    return `
-      <div class="subjectColorRow">
-        <div class="settingsLabel">${esc(name)}</div>
-        <input class="colorPicker" data-subject="${esc(name)}" value="${esc(val)}" placeholder="#F7A8C6" />
-      </div>
-    `;
-  }).join("");
-
-  $$(".colorPicker", root).forEach(inp => {
-    inp.addEventListener("change", () => {
-      const subject = inp.getAttribute("data-subject");
-      const v = inp.value.trim();
-      if (!subject) return;
-      if (!v) delete state.subjectColors[subject];
-      else state.subjectColors[subject] = v;
-      saveLS(LS.SUBJECT_COLORS, state.subjectColors);
-      renderSchedule();
-    });
+function renderMain() {
+  // расписание
+  renderSchedule({
+    state,
+    getWeekType,
+    rootEls: {
+      listEl: $("#lessonList"),
+      hintEl: $("#scheduleHint"),
+      nextCardEl: $("#nextLessonCard"),
+    }
   });
-}
 
-/* ---------------------------
-  Modular loader (динамические импорты)
---------------------------- */
-async function tryImport(path, key) {
-  try {
-    const mod = await import(path);
-    state.mods[key] = mod;
-    return mod;
-  } catch (e) {
-    console.warn(`[UniWeek] Module failed: ${path}`, e);
-    state.mods[key] = null;
-    return null;
-  }
-}
-
-async function loadModules() {
-  // грузим все, но приложение не падает если что-то не так
-  await Promise.all([
-    tryImport("./calendar.js", "calendar"),
-    tryImport("./notes.js", "notes"),
-    tryImport("./quiz.js", "quiz"),
-    tryImport("./memory.js", "memory"),
-    tryImport("./praise.js", "praise"),
-    tryImport("./swipe.js", "swipe"),
-    tryImport("./csvParser.js", "csv"),
-    tryImport("./schedule.js", "schedule"),
-    tryImport("./nextLesson.js", "nextLesson"),
-    tryImport("./progress.js", "progress"),
-    tryImport("./achievements.js", "achievements"),
-  ]);
+  // настройки (когда открыты)
+  if (state.screen === "settings") renderSettings();
 }
 
 /* ---------------------------
   Events
 --------------------------- */
 function bindEvents() {
-  // tabs
-  $("#tabSchedule")?.addEventListener("click", () => { setScreen("schedule"); });
-  $("#tabWishes")?.addEventListener("click", () => { setScreen("wishes"); });
-  $("#tabNotes")?.addEventListener("click", () => { setScreen("notes"); });
-  $("#tabSettings")?.addEventListener("click", () => { setScreen("settings"); renderSettings(); });
+  $("#tabSchedule")?.addEventListener("click", () => setScreen("schedule"));
+  $("#tabWishes")?.addEventListener("click", () => setScreen("wishes"));
+  $("#tabNotes")?.addEventListener("click", () => setScreen("notes"));
+  $("#tabSettings")?.addEventListener("click", () => setScreen("settings"));
 
-  // day arrows
   $("#dayPrevBtn")?.addEventListener("click", () => {
     const d = new Date(state.selectedDate);
     d.setDate(d.getDate() - 1);
     state.selectedDate = d;
-    renderAll();
+    renderTopBar(); renderDayStrip(); renderMain();
   });
+
   $("#dayNextBtn")?.addEventListener("click", () => {
     const d = new Date(state.selectedDate);
     d.setDate(d.getDate() + 1);
     state.selectedDate = d;
-    renderAll();
+    renderTopBar(); renderDayStrip(); renderMain();
   });
 
-  // settings: autoWeek toggle
   $("#autoWeekToggle")?.addEventListener("change", (e) => {
     state.autoWeek = !!e.target.checked;
     saveSettings();
-    renderAll();
+    renderTopBar(); renderMain(); renderSettings();
   });
 
-  // anchor date
   $("#anchorDateInput")?.addEventListener("change", (e) => {
     state.anchorDate = String(e.target.value || "").trim();
     saveSettings();
-    renderAll();
+    renderTopBar(); renderMain();
   });
 
-  // manual week
   $("#weekOddBtn")?.addEventListener("click", () => {
     state.manualWeek = "odd";
     saveSettings();
-    renderAll();
+    renderTopBar(); renderMain(); renderSettings();
   });
+
   $("#weekEvenBtn")?.addEventListener("click", () => {
     state.manualWeek = "even";
     saveSettings();
-    renderAll();
+    renderTopBar(); renderMain(); renderSettings();
   });
 
-  // CSV import: если есть модуль csvParser — используем его, иначе fallback (сделаем в следующем файле)
+  // CSV import
   $("#csvInput")?.addEventListener("change", async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
 
     try {
       const text = await f.text();
+      const res = importScheduleFromCsv(text);
 
-      // ожидаем, что csvParser.js экспортирует: importScheduleFromCsv(text) -> {ok,msg,lessons}
-      const csv = state.mods.csv;
-      if (csv?.importScheduleFromCsv) {
-        const res = csv.importScheduleFromCsv(text);
-        if (res?.ok && Array.isArray(res.lessons)) {
-          state.schedule = res.lessons;
-          saveLS(LS.SCHEDULE, state.schedule);
-        }
-        alert(res?.msg || "Импорт завершён");
-      } else {
-        alert("csvParser.js ещё не подключён/пустой. Сейчас я дам его следующим файлом ✅");
+      if (res.ok && Array.isArray(res.lessons)) {
+        state.schedule = res.lessons;
+        saveLS(LS.SCHEDULE, state.schedule);
       }
 
-      renderAll();
+      alert(res.msg || "Импорт завершён");
+      renderMain();
+      renderSettings();
     } catch (err) {
       alert("Ошибка чтения файла: " + (err?.message || err));
     } finally {
@@ -494,7 +342,6 @@ function bindEvents() {
     }
   });
 
-  // export data
   $("#exportJsonBtn")?.addEventListener("click", () => {
     const data = {
       schedule: state.schedule,
@@ -515,119 +362,48 @@ function bindEvents() {
     URL.revokeObjectURL(url);
   });
 
-  // reset
   $("#resetAllBtn")?.addEventListener("click", () => {
     if (!confirm("Сбросить всё?")) return;
     for (const k of Object.values(LS)) localStorage.removeItem(k);
     loadAll();
-    renderAll();
+    renderTopBar(); renderDayStrip(); renderMain();
+    renderSettings();
   });
 
-  // open calendar modal (если модуль будет)
+  // Calendar modal (пока заглушка — позже подключим calendar.js)
   $("#calendarOpenBtn")?.addEventListener("click", () => {
     const dlg = $("#calendarModal");
-    if (!dlg) return;
-    dlg.showModal?.();
-    // если модуль calendar есть — пусть отрендерит
-    state.mods.calendar?.openCalendar?.({ state, onPickDate: (d) => {
-      state.selectedDate = d;
-      dlg.close?.();
-      renderAll();
-    }});
+    const root = $("#calendarRoot");
+    if (root) {
+      root.innerHTML = `
+        <div style="font-weight:900;margin-bottom:6px;">Скоро будет календарь ✨</div>
+        <div style="color:rgba(35,26,32,.72);font-weight:800;">
+          Сейчас мы стабилизируем основу. Следующим шагом подключим calendar.js красиво и полностью.
+        </div>
+      `;
+    }
+    dlg?.showModal?.();
   });
+
   $("#calendarCloseBtn")?.addEventListener("click", () => {
     $("#calendarModal")?.close?.();
   });
 
-  // games buttons
-  $("#openQuizBtn")?.addEventListener("click", () => {
-    $("#quizCard")?.classList.remove("hidden");
-    $("#memoryCard")?.classList.add("hidden");
-    state.mods.quiz?.openQuiz?.({ state });
-  });
-  $("#openMemoryBtn")?.addEventListener("click", () => {
-    $("#memoryCard")?.classList.remove("hidden");
-    $("#quizCard")?.classList.add("hidden");
-    state.mods.memory?.openMemory?.({ state });
-  });
-  $("#quizBackBtn")?.addEventListener("click", () => {
-    $("#quizCard")?.classList.add("hidden");
-  });
-  $("#memoryBackBtn")?.addEventListener("click", () => {
-    $("#memoryCard")?.classList.add("hidden");
-  });
-
-  // notes screen init
-  $("#tabNotes")?.addEventListener("click", () => {
-    state.mods.notes?.openNotes?.({ state });
-  });
-}
-
-/* ---------------------------
-  Render all
---------------------------- */
-function renderAll() {
-  renderTopBar();
-  renderTabs();
-  renderDayStrip();
-  renderSchedule();
-
-  if (state.screen === "settings") renderSettings();
-
-  // пусть модули тоже обновятся, если они умеют
-  state.mods.progress?.renderProgress?.({ state });
-  state.mods.achievements?.renderAchievements?.({ state });
-}
-
-/* ---------------------------
-  SW register
---------------------------- */
-async function registerSW() {
-  if (!("serviceWorker" in navigator)) return;
-  try {
-    if (location.protocol === "file:") return;
-    await navigator.serviceWorker.register("./sw.js", { scope: "./" });
-  } catch (e) {
-    console.warn("SW register failed:", e);
-  }
+  // Игры/заметки пока заглушки, чтобы не ломали UI
+  $("#openQuizBtn")?.addEventListener("click", () => alert("Quiz подключим следующим блоком файлов 💗"));
+  $("#openMemoryBtn")?.addEventListener("click", () => alert("Memory подключим следующим блоком файлов 💗"));
+  $("#noteCreateBtn")?.addEventListener("click", () => alert("Заметки подключим после календаря 💗"));
 }
 
 /* ---------------------------
   Boot
 --------------------------- */
-function showFatal(err) {
-  const card = $("#nextLessonCard");
-  if (card) {
-    card.innerHTML = `
-      <div class="nextLesson">
-        <div class="nextLesson__title">Ошибка запуска</div>
-        <div class="nextLesson__text">${esc(err?.message || err)}</div>
-        <div class="nextLesson__text">Открой DevTools → Console и пришли красные строки.</div>
-      </div>
-    `;
-  }
-}
-
-document.addEventListener("DOMContentLoaded", async () => {
-  try {
-    disablePinchZoom();
-    loadAll();
-    await loadModules();     // важно: модули подгрузятся, но не уронят app
-    bindEvents();
-
-    // если модуль swipe есть — пусть подключит свайпы между днями/экранами
-    state.mods.swipe?.initSwipe?.({ state, onChange: renderAll });
-
-    renderAll();
-    // registerSW();
-  } catch (err) {
-    console.error(err);
-    showFatal(err);
-  }
+document.addEventListener("DOMContentLoaded", () => {
+  disablePinchZoom();
+  loadAll();
+  bindEvents();
+  renderTabs();
+  renderTopBar();
+  renderDayStrip();
+  renderMain();
 });
-
-
-
-
-
-
