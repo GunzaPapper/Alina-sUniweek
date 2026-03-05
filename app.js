@@ -175,14 +175,13 @@ function renderTopBar() {
     weekType === "odd"
       ? "Неделя: числитель"
       : "Неделя: знаменатель";
-
+}
   .topBar__center{
   text-align:center;
   line-height:1.12;
   width:100%;
   justify-self:center;
   }
-}
 
 /* ---------------------------
   Day strip (быстрый рендер недели)
@@ -632,6 +631,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     showFatal(err);
   }
 });
+
 
 
 
