@@ -2,45 +2,36 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-
-  <!-- Viewport + safe-area + anti-zoom -->
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
-  />
-
+  <!-- anti-zoom + safe area -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#F7A8C6" />
-  <meta name="color-scheme" content="light" />
 
-  <!-- PWA -->
+  <!-- PWA / iOS -->
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="UniWeek" />
 
-  <title>UniWeek</title>
+  <title>Alina's UniWeek</title>
 
   <link rel="manifest" href="./manifest.webmanifest" />
 
-  <!-- Icons -->
-  <link rel="apple-touch-icon" href="./icons/icon-180.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32.png" />
+  <!-- icons: поставь реальные файлы в /icons -->
+  <link rel="apple-touch-icon" href="./icons/icon-180x180.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32x32.png" />
 
-  <!-- Styles -->
   <link rel="stylesheet" href="./styles.css" />
 </head>
 
 <body>
   <div class="appRoot" id="appRoot">
     <!-- Top bar -->
-    <header class="topBar">
+    <header class="topBar" id="topBar">
       <div class="topBar__left">
         <button class="iconBtn" id="dayPrevBtn" type="button" aria-label="Предыдущий день">‹</button>
       </div>
 
       <div class="topBar__center">
-        <div class="topBar__title" id="monthTitle">—</div>
+        <div class="topBar__title" id="monthTitle">Alina's UniWeek 💗</div>
         <div class="topBar__subtitle" id="weekSubtitle">—</div>
       </div>
 
@@ -51,13 +42,12 @@
     </header>
 
     <!-- Day strip -->
-    <section class="dayStripWrap">
+    <section class="dayStripWrap" id="dayStripWrap">
       <div class="dayStrip" id="dayStrip" aria-label="Дни недели"></div>
     </section>
 
     <!-- Main -->
     <main class="main" id="main">
-      <!-- Schedule -->
       <section class="screen screen--active" id="screenSchedule" aria-label="Расписание">
         <div class="card card--soft fadeIn" id="nextLessonCard" aria-live="polite"></div>
 
@@ -70,7 +60,6 @@
         </div>
       </section>
 
-      <!-- Wishes -->
       <section class="screen" id="screenWishes" aria-label="Пожелания">
         <div class="card fadeIn">
           <div class="cardHeader">
@@ -83,20 +72,20 @@
         <div class="card fadeIn">
           <div class="cardHeader">
             <div class="cardTitle">Игры</div>
-            <div class="cardHint">победа → похвала ✨</div>
+            <div class="cardHint">скоро подключим ✨</div>
           </div>
 
           <div class="gameGrid">
-            <button class="gameCard" id="openQuizBtn" type="button" aria-label="Открыть Quiz">
+            <button class="gameCard" id="openQuizBtn" type="button">
               <div class="gameCard__emoji">🧠</div>
               <div class="gameCard__title">Quiz</div>
-              <div class="gameCard__sub">темы + уровни</div>
+              <div class="gameCard__sub">в разработке</div>
             </button>
 
-            <button class="gameCard" id="openMemoryBtn" type="button" aria-label="Открыть Memory">
+            <button class="gameCard" id="openMemoryBtn" type="button">
               <div class="gameCard__emoji">🍬</div>
               <div class="gameCard__title">Memory</div>
-              <div class="gameCard__sub">сердечки/эмодзи</div>
+              <div class="gameCard__sub">в разработке</div>
             </button>
           </div>
         </div>
@@ -104,8 +93,8 @@
         <div class="card fadeIn hidden" id="quizCard">
           <div class="cardHeader">
             <button class="chipBtn" id="quizBackBtn" type="button">← Назад</button>
-            <div class="cardTitle" id="quizHeaderTitle">Quiz</div>
-            <div class="cardHint" id="quizHeaderHint"></div>
+            <div class="cardTitle">Quiz</div>
+            <div class="cardHint">—</div>
           </div>
           <div id="quizRoot"></div>
         </div>
@@ -113,14 +102,13 @@
         <div class="card fadeIn hidden" id="memoryCard">
           <div class="cardHeader">
             <button class="chipBtn" id="memoryBackBtn" type="button">← Назад</button>
-            <div class="cardTitle" id="memoryHeaderTitle">Memory</div>
-            <div class="cardHint" id="memoryHeaderHint"></div>
+            <div class="cardTitle">Memory</div>
+            <div class="cardHint">—</div>
           </div>
           <div id="memoryRoot"></div>
         </div>
       </section>
 
-      <!-- Notes -->
       <section class="screen" id="screenNotes" aria-label="Заметки">
         <div class="card fadeIn">
           <div class="cardHeader">
@@ -133,43 +121,12 @@
           </div>
 
           <div class="notesList" id="notesList"></div>
+          <div class="empty__text" style="margin-top:10px;">(подключим notes.js после основы)</div>
         </div>
 
-        <div class="card fadeIn hidden" id="noteEditorCard">
-          <div class="cardHeader">
-            <button class="chipBtn" id="noteBackBtn" type="button">← Назад</button>
-            <div class="cardTitle" id="noteEditorTitle">Редактирование</div>
-            <div class="cardHint" id="noteEditorHint"></div>
-          </div>
-
-          <div class="noteEditor">
-            <div class="row">
-              <input class="input" id="noteTitleInput" placeholder="Заголовок" />
-              <button class="btn btn--secondary" id="notePinBtn" type="button" title="Закрепить">📌</button>
-            </div>
-
-            <div class="row">
-              <select class="input" id="noteColorSelect" aria-label="Цвет заметки">
-                <option value="pink">Розовый</option>
-                <option value="peach">Персик</option>
-                <option value="lavender">Лаванда</option>
-                <option value="mint">Мята</option>
-                <option value="gray">Нейтральный</option>
-              </select>
-
-              <button class="btn btn--secondary" id="noteChecklistToggle" type="button">✓ Чек-лист</button>
-              <button class="btn btn--danger" id="noteDeleteBtn" type="button">Удалить</button>
-            </div>
-
-            <textarea class="textarea" id="noteBodyInput" placeholder="Текст… (автосейв)"></textarea>
-
-            <div class="checklist hidden" id="noteChecklist"></div>
-            <button class="btn btn--secondary hidden" id="checklistAddItemBtn" type="button">Добавить пункт</button>
-          </div>
-        </div>
+        <div class="card fadeIn hidden" id="noteEditorCard"></div>
       </section>
 
-      <!-- Settings -->
       <section class="screen" id="screenSettings" aria-label="Настройки">
         <div class="card fadeIn">
           <div class="cardHeader">
@@ -199,7 +156,7 @@
                 <div class="settingsLabel">Неделя вручную</div>
                 <div class="settingsHint">если auto выключен</div>
               </div>
-              <div class="segmented" role="tablist" aria-label="Week type">
+              <div class="segmented" role="tablist">
                 <button class="segBtn" id="weekOddBtn" type="button">Odd</button>
                 <button class="segBtn" id="weekEvenBtn" type="button">Even</button>
               </div>
@@ -254,7 +211,7 @@
       </button>
     </nav>
 
-    <!-- Calendar modal -->
+    <!-- Calendar modal (пока пустой — подключим позже) -->
     <dialog class="modal" id="calendarModal">
       <div class="modal__body">
         <div class="modal__head">
@@ -264,35 +221,7 @@
         <div class="calendarRoot" id="calendarRoot"></div>
       </div>
     </dialog>
-
-    <!-- Praise overlay -->
-    <div class="overlay hidden" id="praiseOverlay" aria-live="polite" aria-modal="true" role="dialog">
-      <div class="overlay__card">
-        <div class="overlay__confetti" id="praiseConfetti" aria-hidden="true"></div>
-        <div class="overlay__title" id="praiseTitle">Умничка 💗</div>
-        <div class="overlay__text" id="praiseText">—</div>
-        <button class="btn overlay__btn" id="praiseCloseBtn" type="button">Продолжить</button>
-      </div>
-    </div>
   </div>
-
-  <!-- Anti-zoom (iOS Safari): block double-tap & pinch -->
-  <script>
-    (function () {
-      // Block double-tap zoom
-      let lastTouchEnd = 0;
-      document.addEventListener("touchend", function (e) {
-        const now = Date.now();
-        if (now - lastTouchEnd <= 300) e.preventDefault();
-        lastTouchEnd = now;
-      }, { passive: false });
-
-      // Block pinch zoom (gesture events exist in iOS Safari)
-      document.addEventListener("gesturestart", function (e) { e.preventDefault(); }, { passive: false });
-      document.addEventListener("gesturechange", function (e) { e.preventDefault(); }, { passive: false });
-      document.addEventListener("gestureend", function (e) { e.preventDefault(); }, { passive: false });
-    })();
-  </script>
 
   <script type="module" src="./app.js"></script>
 </body>
