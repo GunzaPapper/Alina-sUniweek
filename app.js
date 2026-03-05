@@ -1,466 +1,550 @@
-﻿// FILE: app.js
+// app.js (FULL)
+// UniWeek — устойчивый запуск без 404 на модули + базовая логика UI
+// ВАЖНО: этот app.js НЕ импортирует другие js-файлы, чтобы не было 404.
+// Если позже захочешь вернуть модульную структуру — сделаем, но правильно (везде ./).
 
-import * as storage from "./js/storage.js";
-import * as schedule from "./js/schedule.js";
-import * as csvParser from "./js/csvParser.js";
-import * as calendar from "./js/calendar.js";
-import * as nextLesson from "./js/nextLesson.js";
-import * as swipe from "./js/swipe.js";
+/* -----------------------------
+  Helpers
+----------------------------- */
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-import * as quiz from "./js/quiz.js";
-import * as memory from "./js/memory.js";
-import * as achievements from "./js/achievements.js";
-import * as progress from "./js/progress.js";
-import * as praise from "./js/praise.js";
+function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
-import * as notes from "./js/notes.js";
-
-/* ===============================
-   PWA Service Worker
-================================= */
-
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js").catch(() => {});
-  });
+function safeJsonParse(str, fallback) {
+  try { return JSON.parse(str); } catch { return fallback; }
 }
 
-/* ===============================
-   Global State
-================================= */
+function formatTime(t) {
+  // expects "HH:MM"
+  return String(t || "").trim();
+}
 
-const state = {
-  currentTab: "schedule",
-  selectedDate: new Date(),
-  lessons: [],
+function esc(s) {
+  return String(s ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+/* -----------------------------
+  Storage keys
+----------------------------- */
+const LS = {
+  SCHEDULE: "uniweek_schedule_v1",  // array of lessons
+  SUBJECT_COLORS: "uniweek_subject_colors_v1",
+  MANUAL_WEEK: "uniweek_manual_week_v1", // "odd" | "even"
+  AUTO_WEEK: "uniweek_auto_week_v1", // "1" | "0"
+  ANCHOR_DATE: "uniweek_anchor_date_v1", // "YYYY-MM-DD"
+  NOTES: "uniweek_notes_v1",
 };
 
-/* ===============================
-   DOM
-================================= */
-
-const screens = {
-  schedule: document.getElementById("screenSchedule"),
-  wishes: document.getElementById("screenWishes"),
-  notes: document.getElementById("screenNotes"),
-  settings: document.getElementById("screenSettings"),
-};
-
-const tabs = {
-  schedule: document.getElementById("tabSchedule"),
-  wishes: document.getElementById("tabWishes"),
-  notes: document.getElementById("tabNotes"),
-  settings: document.getElementById("tabSettings"),
-};
-
-const lessonList = document.getElementById("lessonList");
-const nextLessonCard = document.getElementById("nextLessonCard");
-
-const dayStrip = document.getElementById("dayStrip");
-const monthTitle = document.getElementById("monthTitle");
-const weekSubtitle = document.getElementById("weekSubtitle");
-
-const dayPrevBtn = document.getElementById("dayPrevBtn");
-const dayNextBtn = document.getElementById("dayNextBtn");
-
-const calendarOpenBtn = document.getElementById("calendarOpenBtn");
-const calendarModal = document.getElementById("calendarModal");
-const calendarCloseBtn = document.getElementById("calendarCloseBtn");
-const calendarRoot = document.getElementById("calendarRoot");
-
-/* ===============================
-   Tabs
-================================= */
-
-function switchTab(tab) {
-  state.currentTab = tab;
-
-  Object.keys(screens).forEach((key) => {
-    screens[key].classList.remove("screen--active");
-    tabs[key].classList.remove("tab--active");
-  });
-
-  screens[tab].classList.add("screen--active");
-  tabs[tab].classList.add("tab--active");
-
-  storage.set("ui.tab", tab);
-}
-
-function initTabs() {
-  tabs.schedule.onclick = () => switchTab("schedule");
-  tabs.wishes.onclick = () => switchTab("wishes");
-  tabs.notes.onclick = () => switchTab("notes");
-  tabs.settings.onclick = () => switchTab("settings");
-
-  const saved = storage.get("ui.tab");
-  if (saved && screens[saved]) switchTab(saved);
-}
-
-/* ===============================
-   Date Helpers
-================================= */
-
-function addDays(date, days) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-function sameDay(a, b) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
-/* ===============================
-   Day Strip
-================================= */
-
-function buildDayStrip() {
-  dayStrip.innerHTML = "";
-
-  const base = new Date(state.selectedDate);
-
-  for (let i = -3; i <= 3; i++) {
-    const d = addDays(base, i);
-
-    const pill = document.createElement("div");
-    pill.className = "dayPill";
-
-    if (sameDay(d, state.selectedDate)) {
-      pill.classList.add("dayPill--active");
-    }
-
-    const dow = d.toLocaleDateString("ru-RU", { weekday: "short" });
-    const date = d.getDate();
-
-    pill.innerHTML = `
-      <div class="dayPill__dow">${dow}</div>
-      <div class="dayPill__date">${date}</div>
-    `;
-
-    if (sameDay(d, new Date())) {
-      const dot = document.createElement("div");
-      dot.className = "todayDot";
-      dot.textContent = "Сегодня";
-      pill.appendChild(dot);
-    }
-
-    pill.onclick = () => {
-      state.selectedDate = d;
-      renderSchedule();
-    };
-
-    dayStrip.appendChild(pill);
-  }
-
-  const month = state.selectedDate.toLocaleDateString("ru-RU", {
-    month: "long",
-    year: "numeric",
-  });
-
-  monthTitle.textContent = month;
-}
-
-/* ===============================
-   Schedule Rendering
-================================= */
-
-function renderSchedule() {
-  buildDayStrip();
-
-  const weekType = schedule.getWeekType(state.selectedDate);
-
-  weekSubtitle.textContent =
-    weekType === "odd" ? "Числитель" : weekType === "even" ? "Знаменатель" : "";
-
-  const lessons = schedule.getLessonsForDate(state.selectedDate);
-
-  lessonList.innerHTML = "";
-
-  if (!lessons.length) {
-    lessonList.innerHTML = `<div class="cardHint">Пар нет</div>`;
-  }
-
-  lessons.forEach((l) => {
-    const card = schedule.renderLessonCard(l);
-    lessonList.appendChild(card);
-  });
-
-  nextLesson.render(nextLessonCard, lessons, state.selectedDate);
-}
-
-/* ===============================
-   Navigation
-================================= */
-
-function initDayButtons() {
-  dayPrevBtn.onclick = () => {
-    state.selectedDate = addDays(state.selectedDate, -1);
-    renderSchedule();
-  };
-
-  dayNextBtn.onclick = () => {
-    state.selectedDate = addDays(state.selectedDate, 1);
-    renderSchedule();
-  };
-}
-
-/* ===============================
-   Swipe
-================================= */
-
-function initSwipe() {
-  swipe.init(document.getElementById("screenSchedule"), {
-    left() {
-      state.selectedDate = addDays(state.selectedDate, 1);
-      renderSchedule();
-    },
-    right() {
-      state.selectedDate = addDays(state.selectedDate, -1);
-      renderSchedule();
-    },
-  });
-}
-
-/* ===============================
-   Calendar
-================================= */
-
-function initCalendar() {
-  calendarOpenBtn.onclick = () => {
-    calendar.render(calendarRoot, state.selectedDate, (d) => {
-      state.selectedDate = d;
-      renderSchedule();
-      calendarModal.close();
-    });
-
-    calendarModal.showModal();
-  };
-
-  calendarCloseBtn.onclick = () => {
-    calendarModal.close();
-  };
-}
-
-/* ===============================
-   CSV Import
-================================= */
-
-function initCSV() {
-  const input = document.getElementById("csvInput");
-
-  input.addEventListener("change", async () => {
-    const file = input.files[0];
-    if (!file) return;
-
-    const text = await file.text();
-
-    const hash = await csvParser.hash(text);
-
-    const last = storage.get("csv.hash");
-
-    if (last === hash) {
-      alert("Этот CSV уже импортирован.");
-      return;
-    }
-
-    const lessons = csvParser.parse(text);
-
-    schedule.setLessons(lessons);
-
-    storage.set("csv.hash", hash);
-
-    renderSchedule();
-
-    alert("Расписание импортировано.");
-  });
-}
-
-/* ===============================
-   Wishes
-================================= */
-
-const wishes = [
+/* -----------------------------
+  Defaults (можешь заменить на свои массивы)
+----------------------------- */
+const BASE_WISHES = [
   "Доброе утро, мой цветочек 🌸💗 как ты спала?",
-  "Ты самая милая девочка на этой планете, моя принцесса 👑💞",
-  "Если вдруг станет грустно — представь, как я тебя обнимаю, любимая 🫂💗",
-  "Ты такая красивая, моя девочка, что я иногда просто залипаю 😌💖",
   "Напоминание на сегодня: я тебя очень сильно люблю 💗",
-  "Пусть сегодня тебя окружают только добрые люди, мой цветочек 🌷✨",
-  "Ты моя принцесса и моя гордость 🥰👑",
-  "Даже если день сложный — ты всё равно моя умничка 💕",
-  "Я бы сейчас поцеловал тебя в лобик, моя девочка 😚💗",
-  "Ты заслуживаешь самого мягкого и спокойного дня, любимая ☁️💞",
-  "Ты такая милая… даже когда злишься 😌💗",
-  "Пожалуйста, береги себя, мой цветочек, ты для меня — целый мир 🌍💖",
-  "Я всегда на твоей стороне, моя принцесса 💞",
-  "Ты самая нежная душа, любимая 🌸💗",
-  "Если устала — иди ко мне, моя девочка, я тебя укрою 🧸💕",
-  "Ты делаешь мою жизнь светлее просто тем, что есть ✨💖",
-  "Я скучаю по тебе даже когда прошло 5 минут, мой цветочек 🥺💗",
-  "Пусть сегодня тебя кто-нибудь похвалит. А если нет — я уже, любимая 💕",
-  "Ты моя радость, моя девочка 🌷💗",
-  "Даже в пижаме ты самая красивая, любимая 😌💞",
-  "Я люблю твою улыбку, мой цветочек. Она лечит 💗✨",
-  "Если кто-то тебя обидит — я мысленно рядом 😌💗",
-  "Ты — моё спокойствие и мой хаос одновременно 🥰",
-  "Пусть сегодня будет момент, когда ты почувствуешь себя счастливой 💖",
-  "Ты можешь быть любой — я люблю тебя во всех версиях 💕",
-  "Ты не обязана быть сильной, любимая. Я рядом 🫂💗",
-  "Я так горжусь тобой, моя девочка 🥺💞",
-  "Ты невероятная. И это не обсуждается 💗✨",
-  "Я бы сейчас просто тихо держал тебя за руку 🫶💖",
-  "Ты самое тёплое, что есть в моей жизни ☀️💞",
-  "Если сомневаешься в себе — вспомни, что ты самая красивая и самая умная девочка на свете 💗✨",
-  "Мне так повезло, что именно ты — моя, любимая 🥺💞",
-  "Спасибо, что ты есть у меня, мой цветочек 💗✨",
-  "Я выбираю тебя каждый день. И буду выбирать 💖",
-  "Пусть сегодня ты почувствуешь себя самой любимой девочкой на свете 🥰💗",
-  "Моя девочка, ты справишься. Даже если по шагам — ты всё равно справишься 💗",
-  "Мой цветочек, у тебя всё получится. Я в тебя верю 💞",
-  "Любимая, ты сильнее любых сложностей 💪💗",
-  "Моя принцесса, сегодня твой день. И ты его проживёшь красиво 👑✨",
-  "Ты умная и способная, моя девочка. Не забывай это 💖",
-  "Если что-то не выйдет с первого раза — выйдет со второго, мой цветочек 🌸",
-  "Ты растёшь и становишься только сильнее 💪💞",
-  "Любимая, у тебя огромный потенциал. И ты его раскрываешь ✨",
-  "Моя принцесса, ты достойна больших побед 👑💗",
-  "Ты уже проделала большой путь, и я горжусь тобой 💖",
-  "Мой цветочек, не бойся ошибок — они делают тебя умнее 🌸✨",
-  "Ты справляешься лучше, чем тебе кажется 💗",
-  "Любимая, ты заслуживаешь успеха 💞",
-  "Моя принцесса, верь в себя так же, как я верю в тебя 👑💖",
-  "Ты способна на большее, моя девочка 💪💗",
-  "Даже если тяжело — ты не сдаёшься. И это уже сила 💞",
-  "Мой цветочек, каждый день ты становишься лучше 🌷✨",
-  "Любимая, у тебя светлая голова и доброе сердце 💗",
-  "Моя принцесса, ты создана для красивой жизни 👑💖",
-  "Ты всё сможешь. А я всегда буду рядом 💞",
-  "Держись Любимая, с холодной головой и теплом в сердце ты справишься 💞",
-  "Иногда я просто смотрю на тебя и понимаю — это моё счастье 💗",
-  "Любимая, ты даже не представляешь, как сильно я тебя ценю 🥺",
-  "Моя девочка, с тобой мне спокойно по-настоящему 💞",
-  "Если бы можно было — я бы сейчас просто молча тебя обнял 🌸",
-  "Ты — мой самый родной человек 💗",
-  "Мне хорошо просто от мысли о тебе 🫶",
-  "Мой цветочек, ты делаешь мою жизнь теплее 🌷",
-  "Любимая, я благодарен судьбе за тебя 💖",
-  "С тобой хочется строить будущее 💞",
-  "Ты моё сердце. И это навсегда 💗",
-  "Даже обычный день становится особенным, если ты в нём есть ✨",
-  "Моя принцесса, ты — моя нежность 👑💗",
-  "Я люблю, как ты смеёшься 🥰",
-  "Ты — мой человек. И это лучшее чувство 💞",
-  "Я рядом, прямо в твоём сердечке 💖"
+  "Ты умничка и красавица 💞",
 ];
 
-const wishBox = document.getElementById("wishBox");
-const wishMoreBtn = document.getElementById("wishMoreBtn");
+const PRAISES = [
+  { t:"Ты моя умничка 💗🥰", s:"Так держать! ✨" },
+  { t:"Вау! Ты супер 💖", s:"Я тобой горжусь 😍" },
+];
 
-function randomWish() {
-  return wishes[Math.floor(Math.random() * wishes.length)];
+/* -----------------------------
+  App state
+----------------------------- */
+const state = {
+  screen: "schedule", // schedule | wishes | notes | settings
+  selectedDate: new Date(),
+  schedule: [],        // lessons
+  subjectColors: {},   // { [courseName]: color }
+  notes: [],
+  manualWeek: "odd",
+  autoWeek: true,
+  anchorDate: "",
+
+  // anti-repeat wishes
+  wishPool: [],
+};
+
+/* -----------------------------
+  Week logic
+----------------------------- */
+// если autoWeek включен — считаем odd/even относительно ANCHOR_DATE
+function getWeekType(date) {
+  if (!state.autoWeek) return state.manualWeek;
+
+  // anchorDate optional; if missing, fallback to manual
+  const a = state.anchorDate?.trim();
+  if (!a) return state.manualWeek;
+
+  const anchor = new Date(a + "T00:00:00");
+  if (Number.isNaN(anchor.getTime())) return state.manualWeek;
+
+  // ISO-ish week diff (by Monday)
+  const monday = (d) => {
+    const x = new Date(d);
+    const day = (x.getDay() + 6) % 7; // Mon=0..Sun=6
+    x.setHours(0,0,0,0);
+    x.setDate(x.getDate() - day);
+    return x;
+  };
+  const w0 = monday(anchor).getTime();
+  const w1 = monday(date).getTime();
+  const diffWeeks = Math.round((w1 - w0) / (7 * 24 * 3600 * 1000));
+  return (diffWeeks % 2 === 0) ? "odd" : "even";
 }
 
-function initWishes() {
-  wishBox.textContent = randomWish();
+/* -----------------------------
+  Load / Save
+----------------------------- */
+function loadAll() {
+  state.schedule = safeJsonParse(localStorage.getItem(LS.SCHEDULE), []);
+  state.subjectColors = safeJsonParse(localStorage.getItem(LS.SUBJECT_COLORS), {});
+  state.notes = safeJsonParse(localStorage.getItem(LS.NOTES), []);
 
-  wishMoreBtn.onclick = () => {
-    wishBox.textContent = randomWish();
-  };
+  state.manualWeek = localStorage.getItem(LS.MANUAL_WEEK) || "odd";
+  state.autoWeek = (localStorage.getItem(LS.AUTO_WEEK) ?? "1") === "1";
+  state.anchorDate = localStorage.getItem(LS.ANCHOR_DATE) || "";
 }
 
-/* ===============================
-   Games
-================================= */
-
-function initGames() {
-  const quizBtn = document.getElementById("openQuizBtn");
-  const memoryBtn = document.getElementById("openMemoryBtn");
-
-  const quizCard = document.getElementById("quizCard");
-  const memoryCard = document.getElementById("memoryCard");
-
-  const quizBackBtn = document.getElementById("quizBackBtn");
-  const memoryBackBtn = document.getElementById("memoryBackBtn");
-
-  quizBtn.onclick = () => {
-    quizCard.classList.remove("hidden");
-    memoryCard.classList.add("hidden");
-    quiz.start("quizRoot");
-  };
-
-  memoryBtn.onclick = () => {
-    memoryCard.classList.remove("hidden");
-    quizCard.classList.add("hidden");
-    memory.start("memoryRoot");
-  };
-
-  quizBackBtn.onclick = () => {
-    quizCard.classList.add("hidden");
-  };
-
-  memoryBackBtn.onclick = () => {
-    memoryCard.classList.add("hidden");
-  };
+function saveSchedule() {
+  localStorage.setItem(LS.SCHEDULE, JSON.stringify(state.schedule));
+}
+function saveColors() {
+  localStorage.setItem(LS.SUBJECT_COLORS, JSON.stringify(state.subjectColors));
+}
+function saveSettings() {
+  localStorage.setItem(LS.MANUAL_WEEK, state.manualWeek);
+  localStorage.setItem(LS.AUTO_WEEK, state.autoWeek ? "1" : "0");
+  localStorage.setItem(LS.ANCHOR_DATE, state.anchorDate);
+}
+function saveNotes() {
+  localStorage.setItem(LS.NOTES, JSON.stringify(state.notes));
 }
 
-/* ===============================
-   Settings
-================================= */
+/* -----------------------------
+  UI rendering
+----------------------------- */
+function renderTopBar() {
+  const monthTitle = $("#monthTitle");
+  const weekSubtitle = $("#weekSubtitle");
+  if (!monthTitle || !weekSubtitle) return;
 
-function initSettings() {
-  const autoToggle = document.getElementById("autoWeekToggle");
-  const anchorInput = document.getElementById("anchorDateInput");
+  const d = state.selectedDate;
+  const month = d.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  monthTitle.textContent = month.charAt(0).toUpperCase() + month.slice(1);
 
-  autoToggle.checked = storage.get("week.auto", true);
-  anchorInput.value = storage.get("week.anchor", "2024-09-02");
-
-  autoToggle.onchange = () => {
-    storage.set("week.auto", autoToggle.checked);
-    renderSchedule();
-  };
-
-  anchorInput.onchange = () => {
-    storage.set("week.anchor", anchorInput.value);
-    renderSchedule();
-  };
-
-  const resetBtn = document.getElementById("resetAllBtn");
-
-  resetBtn.onclick = () => {
-    if (!confirm("Удалить все данные?")) return;
-
-    storage.clear();
-    location.reload();
-  };
+  const weekType = getWeekType(d);
+  weekSubtitle.textContent = `Неделя: ${weekType === "odd" ? "Odd (числ)" : "Even (знам)"}`;
 }
 
-/* ===============================
-   Init
-================================= */
+function renderTabs() {
+  const map = {
+    schedule: ["#tabSchedule", "#screenSchedule"],
+    wishes: ["#tabWishes", "#screenWishes"],
+    notes: ["#tabNotes", "#screenNotes"],
+    settings: ["#tabSettings", "#screenSettings"],
+  };
 
-function init() {
-  state.lessons = schedule.getLessons();
+  for (const [k, [tabSel, screenSel]] of Object.entries(map)) {
+    const tab = $(tabSel);
+    const screen = $(screenSel);
+    if (!tab || !screen) continue;
+    tab.classList.toggle("tab--active", state.screen === k);
+    screen.classList.toggle("screen--active", state.screen === k);
+  }
+}
 
-  initTabs();
-  initDayButtons();
-  initSwipe();
-  initCalendar();
-  initCSV();
-  initWishes();
-  initGames();
-  initSettings();
+function lessonMatchesDate(lesson, date) {
+  // lesson: {courseName,type,dayOfWeek,startTime,endTime,weekType,location,color}
+  const dayNames = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+  const dow = dayNames[date.getDay()];
+  const wt = getWeekType(date); // "odd"/"even"
+  const lt = (lesson.weekType || "").toLowerCase().trim();
+  const okWeek = !lt || lt === "any" || lt === wt;
+  const okDay = (lesson.dayOfWeek || "").toLowerCase().trim() === dow;
+  return okDay && okWeek;
+}
 
-  notes.init();
+function sortByTime(a, b) {
+  return formatTime(a.startTime).localeCompare(formatTime(b.startTime));
+}
 
-  achievements.init();
-  progress.init();
+function renderSchedule() {
+  const list = $("#lessonList");
+  const hint = $("#scheduleHint");
+  const nextCard = $("#nextLessonCard");
+  if (!list || !hint || !nextCard) return;
 
+  const items = state.schedule
+    .filter(l => lessonMatchesDate(l, state.selectedDate))
+    .sort(sortByTime);
+
+  hint.textContent = items.length ? `${items.length} шт.` : "Пока пусто — импортируй CSV в Настройках";
+
+  // list
+  if (!items.length) {
+    list.innerHTML = `
+      <div class="empty">
+        <div class="empty__title">Пока нет пар на этот день 💗</div>
+        <div class="empty__text">Зайди в «Настройки» → «Импорт CSV» и выбери файл расписания.</div>
+      </div>
+    `;
+  } else {
+    list.innerHTML = items.map(l => {
+      const color = l.color || state.subjectColors[l.courseName] || "#F7A8C6";
+      const type = (l.type || "").toLowerCase();
+      const icon = type === "lecture" ? "🎓" : type === "seminar" ? "📝" : "📌";
+      return `
+        <div class="lesson">
+          <div class="lesson__bar" style="background:${esc(color)}"></div>
+          <div class="lesson__main">
+            <div class="lesson__top">
+              <div class="lesson__time">${esc(formatTime(l.startTime))}–${esc(formatTime(l.endTime))}</div>
+              <div class="lesson__type">${icon}</div>
+            </div>
+            <div class="lesson__title">${esc(l.courseName || "—")}</div>
+            <div class="lesson__meta">${esc(l.location || "")}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  // next lesson card (today only)
+  const now = new Date();
+  const sameDay =
+    now.getFullYear() === state.selectedDate.getFullYear() &&
+    now.getMonth() === state.selectedDate.getMonth() &&
+    now.getDate() === state.selectedDate.getDate();
+
+  if (!sameDay || !items.length) {
+    nextCard.innerHTML = `
+      <div class="nextLesson">
+        <div class="nextLesson__title">Следующая пара</div>
+        <div class="nextLesson__text">${sameDay ? "Сегодня пар нет 💗" : "Выбери сегодняшний день, чтобы увидеть следующую пару"}</div>
+      </div>
+    `;
+    return;
+  }
+
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const cur = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+  const next = items.find(x => formatTime(x.endTime) > cur) || null;
+
+  if (!next) {
+    nextCard.innerHTML = `
+      <div class="nextLesson">
+        <div class="nextLesson__title">Следующая пара</div>
+        <div class="nextLesson__text">На сегодня всё 💗</div>
+      </div>
+    `;
+  } else {
+    nextCard.innerHTML = `
+      <div class="nextLesson">
+        <div class="nextLesson__title">Следующая пара</div>
+        <div class="nextLesson__big">${esc(next.courseName || "—")}</div>
+        <div class="nextLesson__text">${esc(formatTime(next.startTime))}–${esc(formatTime(next.endTime))} • ${esc(next.location || "")}</div>
+      </div>
+    `;
+  }
+}
+
+function ensureWishPool() {
+  if (!state.wishPool.length) {
+    // новый пул в случайном порядке
+    const arr = BASE_WISHES.slice();
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    state.wishPool = arr;
+  }
+}
+
+function renderWish() {
+  const box = $("#wishBox");
+  if (!box) return;
+
+  ensureWishPool();
+  const text = state.wishPool.pop() || "💗";
+  box.textContent = text;
+}
+
+function renderSettings() {
+  const autoToggle = $("#autoWeekToggle");
+  const anchorInput = $("#anchorDateInput");
+  const manualRow = $("#manualWeekRow");
+  const oddBtn = $("#weekOddBtn");
+  const evenBtn = $("#weekEvenBtn");
+
+  if (autoToggle) autoToggle.checked = state.autoWeek;
+  if (anchorInput) anchorInput.value = state.anchorDate || "";
+  if (manualRow) manualRow.style.display = state.autoWeek ? "none" : "";
+
+  if (oddBtn) oddBtn.classList.toggle("segBtn--active", state.manualWeek === "odd");
+  if (evenBtn) evenBtn.classList.toggle("segBtn--active", state.manualWeek === "even");
+
+  renderSubjectColors();
+}
+
+function renderSubjectColors() {
+  const root = $("#subjectColors");
+  if (!root) return;
+
+  const subjects = Array.from(new Set(state.schedule.map(x => x.courseName).filter(Boolean))).sort((a,b)=>a.localeCompare(b,"ru"));
+  if (!subjects.length) {
+    root.innerHTML = `<div class="empty__text">Появится после импорта расписания 💗</div>`;
+    return;
+  }
+
+  root.innerHTML = subjects.map(name => {
+    const val = state.subjectColors[name] || "";
+    return `
+      <div class="colorRow">
+        <div class="colorRow__name">${esc(name)}</div>
+        <input class="input colorRow__input" data-subject="${esc(name)}" value="${esc(val)}" placeholder="#F7A8C6" />
+      </div>
+    `;
+  }).join("");
+
+  $$(".colorRow__input", root).forEach(inp => {
+    inp.addEventListener("change", () => {
+      const subject = inp.getAttribute("data-subject");
+      const v = inp.value.trim();
+      if (!subject) return;
+      if (!v) delete state.subjectColors[subject];
+      else state.subjectColors[subject] = v;
+      saveColors();
+      renderSchedule();
+    });
+  });
+}
+
+/* -----------------------------
+  CSV Import (минимально рабочий)
+  expected columns:
+  courseName,type,dayOfWeek,startTime,endTime,weekType,location,color
+----------------------------- */
+function parseCsv(text) {
+  // простой CSV: поддержка кавычек "..."
+  const rows = [];
+  let cur = "", inQ = false;
+  const out = [];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (ch === '"' && next === '"') { cur += '"'; i++; continue; }
+    if (ch === '"') { inQ = !inQ; continue; }
+    if (ch === "," && !inQ) { out.push(cur); cur = ""; continue; }
+    if ((ch === "\n" || ch === "\r") && !inQ) {
+      if (ch === "\r" && next === "\n") i++;
+      out.push(cur); cur = "";
+      rows.push(out.slice());
+      out.length = 0;
+      continue;
+    }
+    cur += ch;
+  }
+  if (cur.length || out.length) { out.push(cur); rows.push(out.slice()); }
+  return rows.filter(r => r.some(c => String(c).trim() !== ""));
+}
+
+function importScheduleFromCsv(csvText) {
+  const rows = parseCsv(csvText);
+  if (!rows.length) return { ok:false, msg:"CSV пустой" };
+
+  const header = rows[0].map(x => String(x).trim());
+  const idx = (name) => header.indexOf(name);
+
+  const needed = ["courseName","type","dayOfWeek","startTime","endTime","weekType","location","color"];
+  for (const k of needed) {
+    if (idx(k) === -1) return { ok:false, msg:`Нет колонки: ${k}` };
+  }
+
+  const lessons = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const get = (k) => (r[idx(k)] ?? "").toString().trim();
+    const courseName = get("courseName");
+    if (!courseName) continue;
+    lessons.push({
+      courseName,
+      type: get("type"),
+      dayOfWeek: get("dayOfWeek").toLowerCase(),
+      startTime: get("startTime"),
+      endTime: get("endTime"),
+      weekType: get("weekType").toLowerCase(),
+      location: get("location"),
+      color: get("color"),
+    });
+  }
+
+  state.schedule = lessons;
+  saveSchedule();
+  return { ok:true, msg:`Импортировано: ${lessons.length}` };
+}
+
+/* -----------------------------
+  Navigation / events
+----------------------------- */
+function bindEvents() {
+  // tabs
+  $("#tabSchedule")?.addEventListener("click", () => { state.screen="schedule"; renderAll(); });
+  $("#tabWishes")?.addEventListener("click", () => { state.screen="wishes"; renderAll(); });
+  $("#tabNotes")?.addEventListener("click", () => { state.screen="notes"; renderAll(); });
+  $("#tabSettings")?.addEventListener("click", () => { state.screen="settings"; renderAll(); });
+
+  // day arrows
+  $("#dayPrevBtn")?.addEventListener("click", () => {
+    const d = new Date(state.selectedDate);
+    d.setDate(d.getDate() - 1);
+    state.selectedDate = d;
+    renderAll();
+  });
+  $("#dayNextBtn")?.addEventListener("click", () => {
+    const d = new Date(state.selectedDate);
+    d.setDate(d.getDate() + 1);
+    state.selectedDate = d;
+    renderAll();
+  });
+
+  // wish
+  $("#wishMoreBtn")?.addEventListener("click", () => renderWish());
+
+  // settings: autoWeek toggle
+  $("#autoWeekToggle")?.addEventListener("change", (e) => {
+    state.autoWeek = !!e.target.checked;
+    saveSettings();
+    renderAll();
+  });
+
+  // anchor date
+  $("#anchorDateInput")?.addEventListener("change", (e) => {
+    state.anchorDate = String(e.target.value || "").trim();
+    saveSettings();
+    renderAll();
+  });
+
+  // manual week buttons
+  $("#weekOddBtn")?.addEventListener("click", () => {
+    state.manualWeek = "odd";
+    saveSettings();
+    renderAll();
+  });
+  $("#weekEvenBtn")?.addEventListener("click", () => {
+    state.manualWeek = "even";
+    saveSettings();
+    renderAll();
+  });
+
+  // CSV import
+  $("#csvInput")?.addEventListener("change", async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+
+    try {
+      const text = await f.text();
+      const res = importScheduleFromCsv(text);
+      alert(res.msg);
+      renderAll();
+    } catch (err) {
+      alert("Ошибка чтения файла: " + (err?.message || err));
+    } finally {
+      e.target.value = "";
+    }
+  });
+
+  // export data
+  $("#exportJsonBtn")?.addEventListener("click", () => {
+    const data = {
+      schedule: state.schedule,
+      subjectColors: state.subjectColors,
+      manualWeek: state.manualWeek,
+      autoWeek: state.autoWeek,
+      anchorDate: state.anchorDate,
+      notes: state.notes,
+      exportedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type:"application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "uniweek-export.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  // reset
+  $("#resetAllBtn")?.addEventListener("click", () => {
+    if (!confirm("Сбросить всё?")) return;
+    for (const k of Object.values(LS)) localStorage.removeItem(k);
+    loadAll();
+    renderAll();
+  });
+}
+
+/* -----------------------------
+  Render all
+----------------------------- */
+function renderAll() {
+  renderTopBar();
+  renderTabs();
   renderSchedule();
+  if (state.screen === "wishes") renderWish();
+  if (state.screen === "settings") renderSettings();
 }
 
+/* -----------------------------
+  Service worker (safe)
+----------------------------- */
+async function registerSW() {
+  // ВАЖНО: sw.js должен лежать рядом с index.html
+  if (!("serviceWorker" in navigator)) return;
 
-init();
+  try {
+    // на file:// сервис-воркер не работает
+    if (location.protocol === "file:") return;
+
+    await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+  } catch (e) {
+    // не ломаем приложение, просто выводим в консоль
+    console.warn("SW register failed:", e);
+  }
+}
+
+/* -----------------------------
+  Boot
+----------------------------- */
+function showFatal(err) {
+  // если что-то прям упало — покажем текст хотя бы в карточке
+  const card = $("#nextLessonCard");
+  if (card) {
+    card.innerHTML = `
+      <div class="nextLesson">
+        <div class="nextLesson__title">Ошибка запуска</div>
+        <div class="nextLesson__text">${esc(err?.message || err)}</div>
+        <div class="nextLesson__text">Открой DevTools → Console и пришли мне красные строки.</div>
+      </div>
+    `;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  try {
+    loadAll();
+    bindEvents();
+    renderAll();
+    registerSW();
+  } catch (err) {
+    console.error(err);
+    showFatal(err);
+  }
+});
