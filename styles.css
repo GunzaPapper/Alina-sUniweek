@@ -84,10 +84,10 @@ a{ color:inherit; }
   top: 0;
   z-index: 30;
 
-  padding-top: calc(10px + var(--safe-top));
-  padding-bottom: 12px;
-  padding-left: 14px;
-  padding-right: 14px;
+  padding-top: calc(12px + var(--safe-top));
+  padding-bottom: 10px;
+  padding-left: calc(14px + var(--safe-left));
+  padding-right: calc(14px + var(--safe-right));
 
   display:grid;
   grid-template-columns: 60px 1fr 60px;
@@ -99,7 +99,7 @@ a{ color:inherit; }
 
   border-bottom-left-radius: 22px;
   border-bottom-right-radius: 22px;
-  overflow:hidden;
+  overflow: visible;
 }
 
 .topBar__center{
@@ -684,6 +684,7 @@ a{ color:inherit; }
   .topBar{ max-width: 760px; margin: 0 auto; }
   .bottomTabs{ max-width: 760px; margin: 0 auto; left: 0; right: 0; }
 }
+
 
 
 
