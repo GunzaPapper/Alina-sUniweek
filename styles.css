@@ -933,3 +933,15 @@ a {
         right: 0;
     }
 }
+
+.todayDot{
+  gap: 4px;          /* было шире — уменьшаем */
+}
+.todayDot::before{
+  margin-right: 2px; /* чтобы точка ближе к тексту */
+}
+.todayDot__text{
+  font-size: 10px;
+  line-height: 1;
+}
+
