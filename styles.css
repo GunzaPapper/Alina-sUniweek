@@ -202,7 +202,7 @@ a{ color:inherit; }
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  gap:3px;
+  gap:2px;
   margin-top: 2px;
   font-size: 11px;
   color: rgba(36,26,31,.72);
@@ -683,4 +683,5 @@ a{ color:inherit; }
   .topBar{ max-width: 760px; margin: 0 auto; }
   .bottomTabs{ max-width: 760px; margin: 0 auto; left: 0; right: 0; }
 }
+
 
