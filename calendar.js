@@ -1,307 +1,230 @@
-// FILE: calendar.js
-// UniWeek — Calendar modal (dialog) + month grid + date select
+// calendar.js (SECONDARY, safe)
+// Рендер календаря в модальном окне <dialog id="calendarModal"> внутри #calendarRoot
+// Использование из app.js:
+//   openCalendar({ state, onPickDate: (date)=>{...} })
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
 function esc(s) {
   return String(s ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;");
-}
-
-function pad2(n) { return String(n).padStart(2, "0"); }
-
-function isSameDay(a, b) {
-  return a.getFullYear() === b.getFullYear()
-    && a.getMonth() === b.getMonth()
-    && a.getDate() === b.getDate();
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 function startOfDay(d) {
   const x = new Date(d);
-  x.setHours(0,0,0,0);
+  x.setHours(0, 0, 0, 0);
   return x;
 }
-
-function addMonths(d, inc) {
-  const x = new Date(d);
-  const day = x.getDate();
-  x.setDate(1);
-  x.setMonth(x.getMonth() + inc);
-  // восстановим день (если в новом месяце меньше дней — clamp)
-  const lastDay = new Date(x.getFullYear(), x.getMonth() + 1, 0).getDate();
-  x.setDate(Math.min(day, lastDay));
-  return x;
+function isSameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
 }
 
-function monthTitle(d) {
+function addMonths(date, delta) {
+  const d = new Date(date);
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + delta);
+  // восстановим число (с clamp)
+  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, last));
+  return d;
+}
+
+function getMonthTitle(d) {
   const s = d.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function getMondayIndex(jsDay) {
-  // JS: Sun=0..Sat=6 -> Mon=0..Sun=6
-  return (jsDay + 6) % 7;
+function buildMonthGrid(viewDate) {
+  // Неделя начинается с понедельника
+  const first = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+  const firstDowMon0 = (first.getDay() + 6) % 7; // Mon=0..Sun=6
+  const start = new Date(first);
+  start.setDate(first.getDate() - firstDowMon0);
+
+  const days = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    days.push(d);
+  }
+  return days;
 }
 
-function lockBodyScroll(lock) {
-  // простая блокировка прокрутки под модалкой (iOS friendly)
-  if (lock) {
-    document.documentElement.style.overflow = "hidden";
-    document.body.style.overflow = "hidden";
-    document.body.style.touchAction = "none";
-  } else {
-    document.documentElement.style.overflow = "";
-    document.body.style.overflow = "";
-    document.body.style.touchAction = "";
-  }
-}
+function ensureStylesOnce() {
+  // Мини-стили для календаря (чтобы не требовать правки styles.css прямо сейчас)
+  if (document.getElementById("uwCalendarInlineStyle")) return;
 
-function ensureCalendarCSS() {
-  // Добавим минимальные стили календаря, чтобы он выглядел красиво
-  // (не ломая твой общий styles.css)
-  if (document.getElementById("uniweek-calendar-inline-css")) return;
-
-  const css = `
-  .calHead{
-    display:flex; align-items:center; justify-content:space-between; gap:10px;
-    margin-bottom:10px;
-  }
-  .calTitle{
-    font-weight:900;
-    letter-spacing:.2px;
-    text-align:center;
-    flex:1;
-    font-size:14px;
-  }
-  .calNavBtn{
-    width:38px; height:38px;
-    border-radius:999px;
-    border:1px solid rgba(247,168,198,.28);
-    background: rgba(255,255,255,.85);
-    cursor:pointer;
-    display:grid; place-items:center;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .calNavBtn:active{ transform: scale(.97); opacity:.92; }
-  .calGrid{
-    display:grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap:8px;
-    user-select:none;
-  }
-  .calDow{
-    font-size:11px;
-    font-weight:800;
-    color: rgba(42,31,37,.65);
-    text-align:center;
-    padding:4px 0;
-  }
-  .calCell{
-    border-radius:14px;
-    border:1px solid rgba(247,168,198,.18);
-    background: rgba(255,255,255,.75);
-    box-shadow: 0 8px 16px rgba(42,31,37,.06);
-    height:42px;
-    display:grid;
-    place-items:center;
-    cursor:pointer;
-    -webkit-tap-highlight-color: transparent;
-    transition: transform 120ms ease, opacity 120ms ease, border-color 120ms ease, background 120ms ease;
-  }
-  .calCell:active{ transform: scale(.98); opacity:.92; }
-  .calCell--muted{
-    opacity:.55;
-  }
-  .calCell--today{
-    border-color: rgba(247,168,198,.55);
-    background: rgba(252,227,238,.55);
-  }
-  .calCell--selected{
-    border-color: rgba(247,168,198,.75);
-    background: linear-gradient(180deg, rgba(247,168,198,.40), rgba(255,255,255,.88));
-  }
-  .calCell__num{
-    font-weight:900;
-    font-size:13px;
-  }
-  `;
   const style = document.createElement("style");
-  style.id = "uniweek-calendar-inline-css";
-  style.textContent = css;
+  style.id = "uwCalendarInlineStyle";
+  style.textContent = `
+    .uwCalHead{
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding: 2px 2px 10px;
+    }
+    .uwCalTitle{
+      font-weight: 900;
+      text-align:center;
+      flex:1;
+    }
+    .uwCalNav{
+      width:40px; height:40px;
+      border-radius: 999px;
+      border: 1px solid rgba(247,168,198,.30);
+      background: rgba(255,255,255,.75);
+      box-shadow: 0 10px 18px rgba(42,31,37,.08);
+      display:grid; place-items:center;
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .uwCalNav:active{ transform: scale(.97); opacity:.92; }
+
+    .uwCalDows{
+      display:grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      margin-bottom: 8px;
+      padding: 0 2px;
+      color: rgba(42,31,37,.65);
+      font-weight: 900;
+      font-size: 12px;
+      text-align:center;
+      letter-spacing: .2px;
+    }
+
+    .uwCalGrid{
+      display:grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      padding: 0 2px 2px;
+    }
+
+    .uwCalCell{
+      border-radius: 14px;
+      border: 1px solid rgba(247,168,198,.22);
+      background: rgba(255,255,255,.78);
+      box-shadow: 0 10px 18px rgba(42,31,37,.06);
+      height: 42px;
+      display:grid;
+      place-items:center;
+      cursor:pointer;
+      user-select:none;
+      -webkit-tap-highlight-color: transparent;
+      font-weight: 900;
+    }
+    .uwCalCell:active{ transform: scale(.98); opacity:.92; }
+
+    .uwCalCell--muted{
+      opacity:.45;
+    }
+    .uwCalCell--today{
+      border-color: rgba(247,168,198,.55);
+      box-shadow: 0 12px 22px rgba(42,31,37,.08);
+    }
+    .uwCalCell--selected{
+      background: linear-gradient(180deg, rgba(247,168,198,.40), rgba(255,255,255,.88));
+      border-color: rgba(247,168,198,.55);
+    }
+  `;
   document.head.appendChild(style);
 }
 
-/**
- * initCalendar
- * @param {Object} cfg
- * @param {HTMLDialogElement} cfg.modalEl          #calendarModal
- * @param {HTMLElement} cfg.rootEl                #calendarRoot (контент календаря)
- * @param {HTMLElement} cfg.openBtn               #calendarOpenBtn
- * @param {HTMLElement} cfg.closeBtn              #calendarCloseBtn
- * @param {() => Date} cfg.getSelectedDate        вернуть текущую выбранную дату из state
- * @param {(date: Date) => void} cfg.onSelectDate установить выбранную дату в state и перерендерить
- */
-export function initCalendar(cfg) {
-  ensureCalendarCSS();
+let viewMonth = null; // Date (любая дата внутри текущего отображаемого месяца)
 
-  const modal = cfg?.modalEl || $("#calendarModal");
-  const root = cfg?.rootEl || $("#calendarRoot");
-  const openBtn = cfg?.openBtn || $("#calendarOpenBtn");
-  const closeBtn = cfg?.closeBtn || $("#calendarCloseBtn");
-  const getSelectedDate = cfg?.getSelectedDate || (() => new Date());
-  const onSelectDate = cfg?.onSelectDate || (() => {});
+function renderCalendar(root, selectedDate, onPickDate) {
+  if (!root) return;
 
-  if (!modal || !root || !openBtn || !closeBtn) {
-    console.warn("calendar.js: missing elements");
-    return { open:()=>{}, close:()=>{}, render:()=>{} };
-  }
+  ensureStylesOnce();
 
-  let viewMonth = startOfDay(getSelectedDate());
-  viewMonth.setDate(1);
+  const sel = selectedDate ? startOfDay(selectedDate) : startOfDay(new Date());
+  const today = startOfDay(new Date());
 
-  function render() {
-    const selected = startOfDay(getSelectedDate());
-    const today = startOfDay(new Date());
+  if (!viewMonth) viewMonth = new Date(sel);
+  // держим viewMonth на 1 числе месяца
+  viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1);
 
-    // месяц
-    const first = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1);
-    const firstDow = getMondayIndex(first.getDay()); // 0..6
-    const daysInMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 0).getDate();
+  const title = getMonthTitle(viewMonth);
+  const days = buildMonthGrid(viewMonth);
 
-    // предыдущий месяц (для заполнения сетки)
-    const prevMonthDays = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 0).getDate();
+  const dows = ["ПН","ВТ","СР","ЧТ","ПТ","СБ","ВС"];
 
-    const dows = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
+  root.innerHTML = `
+    <div class="uwCalHead">
+      <button class="uwCalNav" type="button" id="uwCalPrev" aria-label="Предыдущий месяц">‹</button>
+      <div class="uwCalTitle" id="uwCalTitle">${esc(title)}</div>
+      <button class="uwCalNav" type="button" id="uwCalNext" aria-label="Следующий месяц">›</button>
+    </div>
 
-    const cells = [];
+    <div class="uwCalDows">
+      ${dows.map(x => `<div>${esc(x)}</div>`).join("")}
+    </div>
 
-    // "хвост" предыдущего месяца
-    for (let i = 0; i < firstDow; i++) {
-      const num = prevMonthDays - firstDow + 1 + i;
-      const d = new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, num);
-      cells.push({ date:d, muted:true, num });
-    }
+    <div class="uwCalGrid" id="uwCalGrid">
+      ${days.map(d => {
+        const inMonth = d.getMonth() === viewMonth.getMonth();
+        const cls = [
+          "uwCalCell",
+          inMonth ? "" : "uwCalCell--muted",
+          isSameDay(d, today) ? "uwCalCell--today" : "",
+          isSameDay(d, sel) ? "uwCalCell--selected" : "",
+        ].filter(Boolean).join(" ");
 
-    // текущий месяц
-    for (let day = 1; day <= daysInMonth; day++) {
-      const d = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), day);
-      cells.push({ date:d, muted:false, num:day });
-    }
-
-    // добиваем до ровных недель (42 ячейки = 6 строк)
-    while (cells.length < 42) {
-      const last = cells[cells.length - 1].date;
-      const d = new Date(last);
-      d.setDate(d.getDate() + 1);
-      cells.push({ date:d, muted:true, num:d.getDate() });
-    }
-
-    root.innerHTML = `
-      <div class="calHead">
-        <button class="calNavBtn" type="button" data-cal="prev" aria-label="Предыдущий месяц">‹</button>
-        <div class="calTitle">${esc(monthTitle(viewMonth))}</div>
-        <button class="calNavBtn" type="button" data-cal="next" aria-label="Следующий месяц">›</button>
-      </div>
-
-      <div class="calGrid" aria-label="Календарь">
-        ${dows.map(x => `<div class="calDow">${esc(x)}</div>`).join("")}
-
-        ${cells.map(c => {
-          const isToday = isSameDay(c.date, today);
-          const isSel = isSameDay(c.date, selected);
-          const cls = [
-            "calCell",
-            c.muted ? "calCell--muted" : "",
-            isToday ? "calCell--today" : "",
-            isSel ? "calCell--selected" : "",
-          ].filter(Boolean).join(" ");
-
-          const y = c.date.getFullYear();
-          const m = pad2(c.date.getMonth() + 1);
-          const dd = pad2(c.date.getDate());
-          const key = `${y}-${m}-${dd}`;
-
-          return `
-            <button class="${esc(cls)}" type="button" data-cal-date="${esc(key)}" aria-label="${esc(key)}">
-              <div class="calCell__num">${esc(String(c.num))}</div>
-            </button>
-          `;
-        }).join("")}
-      </div>
-    `;
-
-    // nav
-    root.querySelector('[data-cal="prev"]')?.addEventListener("click", () => {
-      viewMonth = addMonths(viewMonth, -1);
-      viewMonth.setDate(1);
-      render();
-    });
-
-    root.querySelector('[data-cal="next"]')?.addEventListener("click", () => {
-      viewMonth = addMonths(viewMonth, +1);
-      viewMonth.setDate(1);
-      render();
-    });
-
-    // select date
-    root.querySelectorAll("[data-cal-date]")?.forEach(btn => {
-      btn.addEventListener("click", () => {
-        const key = btn.getAttribute("data-cal-date");
-        if (!key) return;
-        const d = new Date(key + "T00:00:00");
-        if (Number.isNaN(d.getTime())) return;
-
-        onSelectDate(d);
-        close(); // выбираем дату — закрываем
-      });
-    });
-  }
-
-  function open() {
-    // синхронизируем месяц с выбранной датой
-    const sd = startOfDay(getSelectedDate());
-    viewMonth = new Date(sd.getFullYear(), sd.getMonth(), 1);
-
-    render();
-
-    // dialog.showModal может быть недоступен в некоторых окружениях
-    if (typeof modal.showModal === "function") {
-      modal.showModal();
-    } else {
-      modal.setAttribute("open", "");
-      modal.style.display = "block";
-    }
-    lockBodyScroll(true);
-  }
-
-  function close() {
-    if (typeof modal.close === "function") {
-      modal.close();
-    } else {
-      modal.removeAttribute("open");
-      modal.style.display = "";
-    }
-    lockBodyScroll(false);
-  }
+        return `
+          <button
+            class="${cls}"
+            type="button"
+            data-iso="${esc(d.toISOString())}"
+            aria-label="${esc(d.toLocaleDateString("ru-RU", { day:"numeric", month:"long", year:"numeric" }))}"
+          >${esc(d.getDate())}</button>
+        `;
+      }).join("")}
+    </div>
+  `;
 
   // events
-  openBtn.addEventListener("click", open);
-  closeBtn.addEventListener("click", close);
-
-  // click on backdrop to close (dialog only)
-  modal.addEventListener("click", (e) => {
-    // если кликнули по самому dialog (не по содержимому) — закрываем
-    if (e.target === modal) close();
+  root.querySelector("#uwCalPrev")?.addEventListener("click", () => {
+    viewMonth = addMonths(viewMonth, -1);
+    renderCalendar(root, sel, onPickDate);
   });
 
-  // ESC
-  modal.addEventListener("cancel", (e) => {
-    e.preventDefault();
-    close();
+  root.querySelector("#uwCalNext")?.addEventListener("click", () => {
+    viewMonth = addMonths(viewMonth, +1);
+    renderCalendar(root, sel, onPickDate);
   });
 
-  return { open, close, render };
+  root.querySelectorAll(".uwCalCell").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const iso = btn.getAttribute("data-iso");
+      if (!iso) return;
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return;
+
+      // отдаём выбранную дату наружу
+      if (typeof onPickDate === "function") {
+        onPickDate(startOfDay(d));
+      }
+    });
+  });
+}
+
+/**
+ * Главная точка входа для app.js
+ * openCalendar({ state, onPickDate })
+ */
+export function openCalendar({ state, onPickDate } = {}) {
+  const root = document.getElementById("calendarRoot");
+  if (!root) return;
+
+  // если state есть — берём его выбранную дату
+  const selectedDate = state?.selectedDate ? new Date(state.selectedDate) : new Date();
+
+  // при открытии календаря делаем viewMonth = выбранному месяцу
+  viewMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+
+  renderCalendar(root, selectedDate, onPickDate);
 }
