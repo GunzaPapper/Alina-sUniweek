@@ -1,5 +1,9 @@
-import { importScheduleFromCsv } from "./csvParser.js";
 import { renderSchedule } from "./schedule.js";
+import { importScheduleFromCsv } from "./csvParser.js";
+import { BASE_WISHES } from "./data.js";
+import { initPraise } from "./praise.js";
+import { initQuiz } from "./quiz.js";
+import { initMemory } from "./memory.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -22,16 +26,25 @@ const state = {
   anchorDate: "",
 };
 
+let wishPool = [];
+
 function safeJsonParse(str, fallback) {
-  try { return JSON.parse(str); } catch { return fallback; }
+  try {
+    return JSON.parse(str);
+  } catch {
+    return fallback;
+  }
 }
+
 function loadLS(key, fallback) {
   const raw = localStorage.getItem(key);
   return raw ? safeJsonParse(raw, fallback) : fallback;
 }
+
 function saveLS(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
+
 function esc(s) {
   return String(s ?? "")
     .replaceAll("&", "&amp;")
@@ -45,9 +58,13 @@ function disablePinchZoom() {
   document.addEventListener("gesturechange", (e) => e.preventDefault(), { passive: false });
   document.addEventListener("gestureend", (e) => e.preventDefault(), { passive: false });
 
-  window.addEventListener("wheel", (e) => {
-    if (e.ctrlKey) e.preventDefault();
-  }, { passive: false });
+  window.addEventListener(
+    "wheel",
+    (e) => {
+      if (e.ctrlKey) e.preventDefault();
+    },
+    { passive: false }
+  );
 }
 
 function getWeekType(date) {
@@ -70,7 +87,8 @@ function getWeekType(date) {
   const w0 = monday(anchor).getTime();
   const w1 = monday(date).getTime();
   const diffWeeks = Math.round((w1 - w0) / (7 * 24 * 3600 * 1000));
-  return (diffWeeks % 2 === 0) ? "odd" : "even";
+
+  return diffWeeks % 2 === 0 ? "odd" : "even";
 }
 
 function loadAll() {
@@ -78,7 +96,9 @@ function loadAll() {
   if (!Array.isArray(state.schedule)) state.schedule = [];
 
   state.subjectColors = loadLS(LS.SUBJECT_COLORS, {});
-  if (!state.subjectColors || typeof state.subjectColors !== "object") state.subjectColors = {};
+  if (!state.subjectColors || typeof state.subjectColors !== "object") {
+    state.subjectColors = {};
+  }
 
   state.manualWeek = localStorage.getItem(LS.MANUAL_WEEK) || "odd";
   state.autoWeek = (localStorage.getItem(LS.AUTO_WEEK) ?? "1") === "1";
@@ -111,23 +131,29 @@ function renderTabs() {
     const tab = $(tabSel);
     const screen = $(screenSel);
     if (!tab || !screen) continue;
+
     tab.classList.toggle("tab--active", state.screen === k);
     screen.classList.toggle("screen--active", state.screen === k);
   }
 
   const appRoot = $("#appRoot");
-  if (appRoot) appRoot.classList.toggle("settingsMode", state.screen === "settings");
+  if (appRoot) {
+    appRoot.classList.toggle("settingsMode", state.screen === "settings");
+  }
 }
 
 function renderTopBar() {
   const monthTitle = $("#monthTitle");
   const weekSubtitle = $("#weekSubtitle");
 
-  if (monthTitle) monthTitle.textContent = "Alina's UniWeek 💗";
+  if (monthTitle) {
+    monthTitle.textContent = "Alina's UniWeek 💗";
+  }
 
   if (weekSubtitle) {
     const wt = getWeekType(state.selectedDate);
-    weekSubtitle.textContent = wt === "odd" ? "Неделя: числитель" : "Неделя: знаменатель";
+    weekSubtitle.textContent =
+      wt === "odd" ? "Неделя: числитель" : "Неделя: знаменатель";
   }
 }
 
@@ -153,22 +179,29 @@ function renderDayStrip() {
     days.push(d);
   }
 
-  strip.innerHTML = days.map(d => {
-    const active = isSameDay(d, state.selectedDate);
-    const dow = d.toLocaleDateString("ru-RU", { weekday: "short" }).toUpperCase();
-    const ddmm = d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
-    const todayMark = isSameDay(d, today) ? `<div class="todayDot">today</div>` : "";
+  strip.innerHTML = days
+    .map((d) => {
+      const active = isSameDay(d, state.selectedDate);
+      const dow = d.toLocaleDateString("ru-RU", { weekday: "short" }).toUpperCase();
+      const ddmm = d.toLocaleDateString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+      });
+      const todayMark = isSameDay(d, today)
+        ? `<div class="todayDot"><span class="todayDot__text">today</span></div>`
+        : "";
 
-    return `
-      <button class="dayPill ${active ? "dayPill--active" : ""}" type="button" data-date="${d.toISOString()}">
-        <div class="dayPill__dow">${esc(dow)}</div>
-        <div class="dayPill__date">${esc(ddmm)}</div>
-        ${todayMark}
-      </button>
-    `;
-  }).join("");
+      return `
+        <button class="dayPill ${active ? "dayPill--active" : ""}" type="button" data-date="${d.toISOString()}">
+          <div class="dayPill__dow">${esc(dow)}</div>
+          <div class="dayPill__date">${esc(ddmm)}</div>
+          ${todayMark}
+        </button>
+      `;
+    })
+    .join("");
 
-  $$(".dayPill", strip).forEach(btn => {
+  $$(".dayPill", strip).forEach((btn) => {
     btn.addEventListener("click", () => {
       const iso = btn.getAttribute("data-date");
       state.selectedDate = iso ? new Date(iso) : new Date();
@@ -183,31 +216,36 @@ function renderSubjectColors() {
   const root = $("#subjectColors");
   if (!root) return;
 
-  const subjects = Array.from(new Set((state.schedule || []).map(x => x.courseName).filter(Boolean)))
-    .sort((a, b) => a.localeCompare(b, "ru"));
+  const subjects = Array.from(
+    new Set((state.schedule || []).map((x) => x.courseName).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b, "ru"));
 
   if (!subjects.length) {
     root.innerHTML = `<div class="empty__text">Появится после импорта расписания 💗</div>`;
     return;
   }
 
-  root.innerHTML = subjects.map(name => {
-    const val = state.subjectColors[name] || "";
-    return `
-      <div class="colorRow">
-        <div class="colorRow__name">${esc(name)}</div>
-        <input class="input" data-subject="${esc(name)}" value="${esc(val)}" placeholder="#F7A8C6" />
-      </div>
-    `;
-  }).join("");
+  root.innerHTML = subjects
+    .map((name) => {
+      const val = state.subjectColors[name] || "";
+      return `
+        <div class="colorRow">
+          <div class="colorRow__name">${esc(name)}</div>
+          <input class="input" data-subject="${esc(name)}" value="${esc(val)}" placeholder="#F7A8C6" />
+        </div>
+      `;
+    })
+    .join("");
 
-  $$("input[data-subject]", root).forEach(inp => {
+  $$("input[data-subject]", root).forEach((inp) => {
     inp.addEventListener("change", () => {
       const subject = inp.getAttribute("data-subject");
       const v = (inp.value || "").trim();
       if (!subject) return;
+
       if (!v) delete state.subjectColors[subject];
       else state.subjectColors[subject] = v;
+
       saveLS(LS.SUBJECT_COLORS, state.subjectColors);
       renderMain();
     });
@@ -241,6 +279,23 @@ function renderMain() {
   });
 
   if (state.screen === "settings") renderSettings();
+}
+
+function refillWishPool() {
+  wishPool = BASE_WISHES.slice();
+
+  for (let i = wishPool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [wishPool[i], wishPool[j]] = [wishPool[j], wishPool[i]];
+  }
+}
+
+function showNextWish() {
+  const box = $("#wishBox");
+  if (!box) return;
+
+  if (!wishPool.length) refillWishPool();
+  box.textContent = wishPool.pop() || "Ты умничка 💗";
 }
 
 function bindEvents() {
@@ -330,7 +385,11 @@ function bindEvents() {
       anchorDate: state.anchorDate,
       exportedAt: new Date().toISOString(),
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -343,7 +402,11 @@ function bindEvents() {
 
   $("#resetAllBtn")?.addEventListener("click", () => {
     if (!confirm("Сбросить всё?")) return;
-    for (const k of Object.values(LS)) localStorage.removeItem(k);
+
+    for (const k of Object.values(LS)) {
+      localStorage.removeItem(k);
+    }
+
     loadAll();
     renderTopBar();
     renderDayStrip();
@@ -354,14 +417,16 @@ function bindEvents() {
   $("#calendarOpenBtn")?.addEventListener("click", () => {
     const dlg = $("#calendarModal");
     const root = $("#calendarRoot");
+
     if (root) {
       root.innerHTML = `
         <div style="font-weight:900;margin-bottom:6px;">Скоро будет календарь ✨</div>
         <div style="color:rgba(35,26,32,.72);font-weight:800;">
-          Сейчас мы стабилизируем основу. Следующим шагом подключим calendar.js красиво и полностью.
+          Сейчас подключены пожелания и игры. Следующим шагом можно красиво подключить calendar.js.
         </div>
       `;
     }
+
     dlg?.showModal?.();
   });
 
@@ -369,15 +434,7 @@ function bindEvents() {
     $("#calendarModal")?.close?.();
   });
 
-  $("#wishMoreBtn")?.addEventListener("click", () => {
-    const wishes = [
-      "Ты умничка 💗",
-      "Пусть сегодня всё получится ✨",
-      "Ты справишься, я в тебя верю 🌸"
-    ];
-    const box = $("#wishBox");
-    if (box) box.textContent = wishes[Math.floor(Math.random() * wishes.length)];
-  });
+  $("#wishMoreBtn")?.addEventListener("click", showNextWish);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -388,4 +445,9 @@ document.addEventListener("DOMContentLoaded", () => {
   renderTopBar();
   renderDayStrip();
   renderMain();
+
+  initPraise();
+  initQuiz();
+  initMemory();
+  showNextWish();
 });
