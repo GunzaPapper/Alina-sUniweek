@@ -304,7 +304,10 @@ function showNextWish() {
 function bindEvents() {
   $("#tabSchedule")?.addEventListener("click", () => setScreen("schedule"));
   $("#tabWishes")?.addEventListener("click", () => setScreen("wishes"));
-  $("#tabNotes")?.addEventListener("click", () => setScreen("notes"));
+  $("#tabNotes")?.addEventListener("click", () => {
+    setScreen("notes");
+    openNotes();
+  });
   $("#tabSettings")?.addEventListener("click", () => setScreen("settings"));
 
   $("#dayPrevBtn")?.addEventListener("click", () => {
@@ -418,6 +421,92 @@ function bindEvents() {
   });
 
   $("#calendarOpenBtn")?.addEventListener("click", () => {
+    const dlg = $("#calendarModal");
+    if (!dlg) return;
+
+    dlg.showModal?.();
+
+    openCalendar({
+      state,
+      onPickDate: (date) => {
+        state.selectedDate = date;
+        dlg.close?.();
+        renderTopBar();
+        renderDayStrip();
+        renderMain();
+      }
+    });
+  });
+
+  $("#calendarCloseBtn")?.addEventListener("click", () => {
+    $("#calendarModal")?.close?.();
+  });
+
+  $("#wishMoreBtn")?.addEventListener("click", showNextWish);
+}
+
+  $("#csvInput")?.addEventListener("change", async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+
+    try {
+      const text = await f.text();
+      const res = importScheduleFromCsv(text);
+
+      if (res.ok && Array.isArray(res.lessons)) {
+        state.schedule = res.lessons;
+        saveLS(LS.SCHEDULE, state.schedule);
+      }
+
+      alert(res.msg || "Импорт завершён");
+      renderMain();
+      renderSettings();
+    } catch (err) {
+      alert("Ошибка чтения файла: " + (err?.message || err));
+    } finally {
+      e.target.value = "";
+    }
+  });
+
+  $("#exportJsonBtn")?.addEventListener("click", () => {
+    const data = {
+      schedule: state.schedule,
+      subjectColors: state.subjectColors,
+      manualWeek: state.manualWeek,
+      autoWeek: state.autoWeek,
+      anchorDate: state.anchorDate,
+      exportedAt: new Date().toISOString(),
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "uniweek-export.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  $("#resetAllBtn")?.addEventListener("click", () => {
+    if (!confirm("Сбросить всё?")) return;
+
+    for (const k of Object.values(LS)) {
+      localStorage.removeItem(k);
+    }
+
+    loadAll();
+    renderTopBar();
+    renderDayStrip();
+    renderMain();
+    renderSettings();
+  });
+
+  $("#calendarOpenBtn")?.addEventListener("click", () => {
   const dlg = $("#calendarModal");
   if (!dlg) return;
 
@@ -438,10 +527,6 @@ function bindEvents() {
 $("#calendarCloseBtn")?.addEventListener("click", () => {
   $("#calendarModal")?.close?.();
 });
-
-  $("#calendarCloseBtn")?.addEventListener("click", () => {
-    $("#calendarModal")?.close?.();
-  });
 
   $("#wishMoreBtn")?.addEventListener("click", showNextWish);
 }
