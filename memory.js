@@ -41,17 +41,17 @@ function renderBoard() {
   const totalPairs = MEMORY_SYMBOLS.slice(0, 6).length;
 
   root.innerHTML = `
-    <div class="card card--soft" style="margin-bottom:12px;">
-      <div class="cardHint">Найди все пары</div>
-      <div class="cardTitle" style="margin-top:6px;">Совпадений: ${matched} / ${totalPairs}</div>
+    <div class="memoryHero">
+      <div class="memoryHero__title">Найди все пары 💗</div>
+      <div class="memoryHero__text">Совпадений: ${matched} / ${totalPairs}</div>
     </div>
 
-    <div class="gameGrid" id="memoryGrid">
+    <div class="memoryGrid" id="memoryGrid">
       ${board.map((card) => `
-        <button class="gameCard" type="button" data-id="${card.id}">
-          <div class="gameCard__emoji" style="font-size:28px;">
-            ${card.open || card.done ? card.symbol : "❔"}
-          </div>
+        <button class="memoryTile ${card.open || card.done ? "memoryTile--open" : ""} ${card.done ? "memoryTile--done" : ""}" type="button" data-id="${card.id}">
+          <span class="memoryTile__inner">
+            ${card.open || card.done ? card.symbol : "?"}
+          </span>
         </button>
       `).join("")}
     </div>
@@ -78,24 +78,18 @@ function openCard(id) {
   if (opened.length < 2) return;
 
   locked = true;
-
   const [a, b] = opened;
 
   if (a.symbol === b.symbol) {
     a.done = true;
     b.done = true;
-    a.open = true;
-    b.open = true;
-
     opened = [];
     locked = false;
     matched++;
     renderBoard();
 
     if (matched === MEMORY_SYMBOLS.slice(0, 6).length) {
-      setTimeout(() => {
-        showPraise();
-      }, 250);
+      setTimeout(() => showPraise(), 250);
     }
   } else {
     setTimeout(() => {
