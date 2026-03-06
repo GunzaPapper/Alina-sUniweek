@@ -1,4 +1,4 @@
-import { QUESTIONS_RAW, normalizeQuestions } from "./data.js";
+import { QUESTIONS_RAW } from "./data.js";
 import { showPraise } from "./praise.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -19,7 +19,6 @@ function shuffle(arr) {
 }
 
 function getQuestions() {
-  const clean = normalizeQuestions(QUESTIONS_RAW);
   return shuffle(clean).slice(0, 5);
 }
 
