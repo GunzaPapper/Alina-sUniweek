@@ -1,4 +1,3 @@
-// memory.js
 import { MEMORY_SYMBOLS } from "./data.js";
 import { showPraise } from "./praise.js";
 
@@ -28,14 +27,12 @@ function getSymbols() {
 function buildBoard() {
   const pairs = [...getSymbols(), ...getSymbols()];
 
-  board = shuffle(pairs).map((symbol, idx) => {
-    return {
-      id: idx,
-      symbol,
-      open: false,
-      done: false
-    };
-  });
+  board = shuffle(pairs).map((symbol, idx) => ({
+    id: idx,
+    symbol,
+    open: false,
+    done: false
+  }));
 
   opened = [];
   locked = false;
@@ -48,16 +45,17 @@ function renderBoard() {
 
   const totalPairs = board.length / 2;
 
-  const cardsHtml = board.map((card) => {
-    const isOpen = card.open || card.done;
+  const cardsHtml = board.map((item) => {
+    const isOpen = item.open || item.done;
+
     return `
       <button
-        class="memoryTile ${isOpen ? "memoryTile--open" : ""} ${card.done ? "memoryTile--done" : ""}"
+        class="memoryTile ${isOpen ? "memoryTile--open" : ""} ${item.done ? "memoryTile--done" : ""}"
         type="button"
-        data-id="${card.id}"
+        data-id="${item.id}"
         aria-label="Карточка memory"
       >
-        <span class="memoryTile__inner">${isOpen ? card.symbol : "?"}</span>
+        <span class="memoryTile__inner">${isOpen ? item.symbol : "?"}</span>
       </button>
     `;
   }).join("");
@@ -68,7 +66,7 @@ function renderBoard() {
       <div class="memoryHero__text">Совпадений: ${matched} / ${totalPairs}</div>
     </div>
 
-    <div class="memoryGrid" id="memoryGrid">
+    <div class="memoryGrid">
       ${cardsHtml}
     </div>
   `;
@@ -84,11 +82,11 @@ function renderBoard() {
 function openCard(id) {
   if (locked) return;
 
-  const card = board.find((x) => x.id === id);
-  if (!card  card.open  card.done) return;
+  const item = board.find((x) => x.id === id);
+  if (!item || item.open || item.done) return;
 
-  card.open = true;
-  opened.push(card);
+  item.open = true;
+  opened.push(item);
   renderBoard();
 
   if (opened.length < 2) return;
@@ -100,9 +98,9 @@ function openCard(id) {
   if (a.symbol === b.symbol) {
     a.done = true;
     b.done = true;
+    matched++;
     opened = [];
     locked = false;
-    matched++;
     renderBoard();
 
     if (matched === board.length / 2) {
