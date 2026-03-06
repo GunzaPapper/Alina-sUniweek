@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="ru">
 <head>
+  <meta name="theme-color" content="#f7bfd3" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="UniWeek" />
+
+  <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180x180.png" />
+  <link rel="manifest" href="./manifest.webmanifest" />
   <meta charset="utf-8" />
   <!-- anti-zoom + safe area -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
@@ -34,6 +41,15 @@
 </head>
 
 <body>
+  <div class="launchScreen" id="launchScreen" aria-hidden="true">
+    <div class="launchScreen__inner">
+      <div class="launchScreen__logoWrap">
+        <img class="launchScreen__logo" src="./icons/icon-180x180.png" alt="UniWeek">
+      </div>
+      <div class="launchScreen__title">Alina's UniWeek</div>
+      <div class="launchScreen__heart">💗</div>
+    </div>
+  </div>
   <meta name="theme-color" content="#f7bfd3" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -294,4 +310,5 @@
   <script type="module" src="./app.js"></script>
 </body>
 </html>
+
 
