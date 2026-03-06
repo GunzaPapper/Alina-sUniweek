@@ -938,7 +938,7 @@ a {
   gap: 4px;          /* было шире — уменьшаем */
 }
 .todayDot::before{
-  margin-right: 2px; /* чтобы точка ближе к тексту */
+  margin-right: 1px; /* чтобы точка ближе к тексту */
 }
 .todayDot__text{
   font-size: 10px;
@@ -1046,11 +1046,11 @@ a {
 .memoryGrid{
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 10px;
 }
 
 .memoryTile{
-  aspect-ratio: 1 / 0.62;
+  aspect-ratio: 1 / 0.48;
   border: 1px solid rgba(247,168,198,.18);
   border-radius: 22px;
   background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(252,227,238,.48));
@@ -1070,7 +1070,7 @@ a {
   height: 100%;
   display: grid;
   place-items: center;
-  font-size: 36px;
+  font-size: 28px;
   font-weight: 900;
   color: rgba(100,82,100,.35);
 }
@@ -1099,3 +1099,4 @@ a {
     transform: scale(1) rotateY(0deg);
   }
 }
+
