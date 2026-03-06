@@ -57,7 +57,7 @@ function esc(s) {
 }
 
 function disablePinchZoom() {
-  document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
+  document.("gesturestart", (e) => e.preventDefault(), { passive: false });
   document.addEventListener("gesturechange", (e) => e.preventDefault(), { passive: false });
   document.addEventListener("gestureend", (e) => e.preventDefault(), { passive: false });
 
@@ -446,26 +446,7 @@ $("#calendarCloseBtn")?.addEventListener("click", () => {
   $("#wishMoreBtn")?.addEventListener("click", showNextWish);
 }
 
-document.addEventListener("", () => {
-  initSwipe({
-  state,
-  onPrev: () => {
-    const d = new Date(state.selectedDate);
-    d.setDate(d.getDate() - 1);
-    state.selectedDate = d;
-    renderTopBar();
-    renderDayStrip();
-    renderMain();
-  },
-  onNext: () => {
-    const d = new Date(state.selectedDate);
-    d.setDate(d.getDate() + 1);
-    state.selectedDate = d;
-    renderTopBar();
-    renderDayStrip();
-    renderMain();
-  }
-});
+document.addEventListener("DOMContentLoaded", () => {
   disablePinchZoom();
   loadAll();
   bindEvents();
@@ -477,6 +458,26 @@ document.addEventListener("", () => {
   initPraise();
   initQuiz();
   initMemory();
-  showNextWish();
   initNotes();
+  showNextWish();
+
+  initSwipe({
+    state,
+    onPrev: () => {
+      const d = new Date(state.selectedDate);
+      d.setDate(d.getDate() - 1);
+      state.selectedDate = d;
+      renderTopBar();
+      renderDayStrip();
+      renderMain();
+    },
+    onNext: () => {
+      const d = new Date(state.selectedDate);
+      d.setDate(d.getDate() + 1);
+      state.selectedDate = d;
+      renderTopBar();
+      renderDayStrip();
+      renderMain();
+    }
+  });
 });
