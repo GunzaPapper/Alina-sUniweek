@@ -18,19 +18,24 @@ function shuffle(arr) {
   return a;
 }
 
+function getSymbols() {
+  if (Array.isArray(MEMORY_SYMBOLS) && MEMORY_SYMBOLS.length >= 6) {
+    return MEMORY_SYMBOLS.slice(0, 6);
+  }
+  return ["💗", "🌸", "✨", "🎀", "🫶", "💞"];
+}
+
 function buildBoard() {
-  const symbols = Array.isArray(MEMORY_SYMBOLS) && MEMORY_SYMBOLS.length
-    ? MEMORY_SYMBOLS.slice(0, 6)
-    : ["💗", "🌸", "✨", "🎀", "🫶", "💞"];
+  const pairs = [...getSymbols(), ...getSymbols()];
 
-  const pairs = [...symbols, ...symbols];
-
-  board = shuffle(pairs).map((symbol, idx) => ({
-    id: idx,
-    symbol,
-    open: false,
-    done: false,
-  }));
+  board = shuffle(pairs).map((symbol, idx) => {
+    return {
+      id: idx,
+      symbol,
+      open: false,
+      done: false
+    };
+  });
 
   opened = [];
   locked = false;
@@ -43,6 +48,20 @@ function renderBoard() {
 
   const totalPairs = board.length / 2;
 
+  const cardsHtml = board.map((card) => {
+    const isOpen = card.open || card.done;
+    return `
+      <button
+        class="memoryTile ${isOpen ? "memoryTile--open" : ""} ${card.done ? "memoryTile--done" : ""}"
+        type="button"
+        data-id="${card.id}"
+        aria-label="Карточка memory"
+      >
+        <span class="memoryTile__inner">${isOpen ? card.symbol : "?"}</span>
+      </button>
+    `;
+  }).join("");
+
   root.innerHTML = `
     <div class="memoryHero">
       <div class="memoryHero__title">Memory 💗</div>
@@ -50,18 +69,7 @@ function renderBoard() {
     </div>
 
     <div class="memoryGrid" id="memoryGrid">
-      ${board.map((card) => `
-        <button
-          class="memoryTile ${card.open || card.done ? "memoryTile--open" : ""} ${card.done ? "memoryTile--done" : ""}"
-          type="button"
-          data-id="${card.id}"
-          aria-label="Карточка memory"
-        >
-          <span class="memoryTile__inner">
-            ${card.open || card.done ? card.symbol : "?"}
-          </span>
-        </button>
-      `).join("")}
+      ${cardsHtml}
     </div>
   `;
 
@@ -76,7 +84,7 @@ function renderBoard() {
 function openCard(id) {
   if (locked) return;
 
-  const card = board.find((c) => c.id === id);
+  const card = board.find((x) => x.id === id);
   if (!card  card.open  card.done) return;
 
   card.open = true;
@@ -86,6 +94,7 @@ function openCard(id) {
   if (opened.length < 2) return;
 
   locked = true;
+
   const [a, b] = opened;
 
   if (a.symbol === b.symbol) {
