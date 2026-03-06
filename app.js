@@ -6,6 +6,7 @@ import { initQuiz } from "./quiz.js";
 import { initMemory } from "./memory.js";
 import { openCalendar } from "./calendar.js";
 import { initNotes, openNotes } from "./notes.js";
+import { initSwipe } from "./swipe.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -445,7 +446,26 @@ $("#calendarCloseBtn")?.addEventListener("click", () => {
   $("#wishMoreBtn")?.addEventListener("click", showNextWish);
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("", () => {
+  initSwipe({
+  state,
+  onPrev: () => {
+    const d = new Date(state.selectedDate);
+    d.setDate(d.getDate() - 1);
+    state.selectedDate = d;
+    renderTopBar();
+    renderDayStrip();
+    renderMain();
+  },
+  onNext: () => {
+    const d = new Date(state.selectedDate);
+    d.setDate(d.getDate() + 1);
+    state.selectedDate = d;
+    renderTopBar();
+    renderDayStrip();
+    renderMain();
+  }
+});
   disablePinchZoom();
   loadAll();
   bindEvents();
