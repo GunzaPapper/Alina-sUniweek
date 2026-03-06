@@ -19,22 +19,65 @@ function shuffle(arr) {
   return a;
 }
 
+function normalizeQuestions(raw) {
+  if (!Array.isArray(raw)) return [];
+
+  return raw.filter((q) => {
+    return (
+      q &&
+      typeof q.question === "string" &&
+      Array.isArray(q.options) &&
+      q.options.length >= 2 &&
+      typeof q.answer === "number" &&
+      q.answer >= 0 &&
+      q.answer < q.options.length
+    );
+  });
+}
+
 function renderQuestion() {
   const root = $("#quizRoot");
   if (!root) return;
 
-  const q = quizState.questions[quizState.index];
-  if (!q) {
+  if (!Array.isArray(quizState.questions) || quizState.questions.length === 0) {
     root.innerHTML = `
       <div class="empty">
-        <div class="empty__title">Quiz завершён 💗</div>
-        <div class="empty__text">Правильных ответов: ${quizState.score} из ${quizState.questions.length}</div>
+        <div class="empty__title">Quiz пока недоступен 💗</div>
+        <div class="empty__text">Не удалось загрузить вопросы. Проверь data.js.</div>
       </div>
-      <button class="btn" id="quizRestartBtn" type="button">Играть ещё</button>
+    `;
+    return;
+  }
+
+  if (quizState.index >= quizState.questions.length) {
+    root.innerHTML = `
+      <div class="card card--soft" style="margin-bottom:12px;">
+        <div class="cardHint">Готово ✨</div>
+        <div class="cardTitle" style="margin-top:6px;">Quiz завершён</div>
+      </div>
+
+      <div class="empty">
+        <div class="empty__title">Правильных ответов: ${quizState.score} из ${quizState.questions.length}</div>
+        <div class="empty__text">Очень достойно 💗</div>
+      </div>
+
+      <button class="btn" id="quizRestartBtn" type="button" style="margin-top:12px;">Играть ещё</button>
     `;
 
     $("#quizRestartBtn")?.addEventListener("click", startQuiz);
-    if (quizState.score === quizState.questions.length) showPraise();
+
+    if (quizState.score === quizState.questions.length) {
+      setTimeout(() => showPraise(), 250);
+    }
+
+    return;
+  }
+
+  const q = quizState.questions[quizState.index];
+
+  if (!q || !Array.isArray(q.options)) {
+    quizState.index++;
+    renderQuestion();
     return;
   }
 
@@ -53,10 +96,12 @@ function renderQuestion() {
     </div>
   `;
 
-  root.querySelectorAll("[data-answer]").forEach(btn => {
+  root.querySelectorAll("[data-answer]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const picked = Number(btn.getAttribute("data-answer"));
-      if (picked === q.answer) quizState.score++;
+      if (picked === q.answer) {
+        quizState.score++;
+      }
       quizState.index++;
       renderQuestion();
     });
@@ -64,11 +109,14 @@ function renderQuestion() {
 }
 
 export function startQuiz() {
+  const safeQuestions = normalizeQuestions(QUIZ_QUESTIONS);
+
   quizState = {
     index: 0,
     score: 0,
-    questions: shuffle(QUIZ_QUESTIONS).slice(0, 5)
+    questions: shuffle(safeQuestions).slice(0, 5)
   };
+
   renderQuestion();
 }
 
