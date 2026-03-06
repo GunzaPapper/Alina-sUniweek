@@ -19,7 +19,10 @@ function shuffle(arr) {
 }
 
 function buildBoard() {
-  const symbols = MEMORY_SYMBOLS.slice(0, 6);
+  const symbols = Array.isArray(MEMORY_SYMBOLS) && MEMORY_SYMBOLS.length
+    ? MEMORY_SYMBOLS.slice(0, 6)
+    : ["💗", "🌸", "✨", "🎀", "🫶", "💞"];
+
   const pairs = [...symbols, ...symbols];
 
   board = shuffle(pairs).map((symbol, idx) => ({
@@ -38,17 +41,22 @@ function renderBoard() {
   const root = $("#memoryRoot");
   if (!root) return;
 
-  const totalPairs = MEMORY_SYMBOLS.slice(0, 6).length;
+  const totalPairs = board.length / 2;
 
   root.innerHTML = `
     <div class="memoryHero">
-      <div class="memoryHero__title">Найди все пары 💗</div>
+      <div class="memoryHero__title">Memory 💗</div>
       <div class="memoryHero__text">Совпадений: ${matched} / ${totalPairs}</div>
     </div>
 
     <div class="memoryGrid" id="memoryGrid">
       ${board.map((card) => `
-        <button class="memoryTile ${card.open || card.done ? "memoryTile--open" : ""} ${card.done ? "memoryTile--done" : ""}" type="button" data-id="${card.id}">
+        <button
+          class="memoryTile ${card.open || card.done ? "memoryTile--open" : ""} ${card.done ? "memoryTile--done" : ""}"
+          type="button"
+          data-id="${card.id}"
+          aria-label="Карточка memory"
+        >
           <span class="memoryTile__inner">
             ${card.open || card.done ? card.symbol : "?"}
           </span>
@@ -69,7 +77,7 @@ function openCard(id) {
   if (locked) return;
 
   const card = board.find((c) => c.id === id);
-  if (!card || card.open || card.done) return;
+  if (!card  card.open  card.done) return;
 
   card.open = true;
   opened.push(card);
@@ -88,8 +96,10 @@ function openCard(id) {
     matched++;
     renderBoard();
 
-    if (matched === MEMORY_SYMBOLS.slice(0, 6).length) {
-      setTimeout(() => showPraise(), 250);
+    if (matched === board.length / 2) {
+      setTimeout(() => {
+        showPraise();
+      }, 250);
     }
   } else {
     setTimeout(() => {
@@ -98,7 +108,7 @@ function openCard(id) {
       opened = [];
       locked = false;
       renderBoard();
-    }, 700);
+    }, 650);
   }
 }
 
