@@ -5,6 +5,7 @@ import { initPraise } from "./praise.js";
 import { initQuiz } from "./quiz.js";
 import { initMemory } from "./memory.js";
 import { openCalendar } from "./calendar.js";
+import { initNotes, openNotes } from "./notes.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -457,4 +458,5 @@ document.addEventListener("DOMContentLoaded", () => {
   initQuiz();
   initMemory();
   showNextWish();
+  initNotes();
 });
