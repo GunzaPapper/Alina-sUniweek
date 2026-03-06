@@ -99,7 +99,7 @@ export const PRAISES = [
  * Вставляй сюда ВЕСЬ свой const QUESTIONS = [...] (только массив, без "const QUESTIONS =")
  * или оставь как есть.
  */
-export const QUESTIONS_RAW = [
+export const QUIZ_QUESTIONS = [
   // ======================
   // 🏛️ HISTORY (40)
   // ======================
@@ -355,4 +355,6 @@ export function normalizeQuestions(list){
     map.set(q.id, q); // последний побеждает
   }
   return Array.from(map.values());
+
 }
+export const MEMORY_SYMBOLS = ["💗", "🌸", "✨", "🎀", "🫶", "💞"];
