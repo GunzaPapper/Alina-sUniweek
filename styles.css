@@ -203,22 +203,28 @@ a {
     background: rgba(252,227,238,.55);
 }
 
-.todayDot {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 1px;
-    margin-top: 2px;
-    font-size: 11px;
-    color: rgba(36,26,31,.72);
+.todayDot{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-top: 2px;
+  font-size: 10px;
+  color: rgba(36,26,31,.72);
 }
 
-    .todayDot::before {
-        content: "•";
-        font-size: 16px;
-        line-height: 0;
-        color: var(--pink-strong);
-    }
+.todayDot::before{
+  content: "•";
+  font-size: 13px;
+  line-height: 1;
+  color: var(--pink-strong);
+  margin-right: 1px;
+}
+
+.todayDot__text{
+  font-size: 10px;
+  line-height: 1;
+}
 
 /* ---------- Main ---------- */
 .main {
@@ -1100,3 +1106,82 @@ a {
   }
 }
 
+.memoryHero{
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(252,227,238,.55), rgba(255,255,255,.96));
+  border: 1px solid rgba(247,168,198,.18);
+  box-shadow: var(--shadow-soft);
+}
+
+.memoryHero__title{
+  font-size: 17px;
+  font-weight: 950;
+  margin-bottom: 4px;
+}
+
+.memoryHero__text{
+  font-size: 13px;
+  color: rgba(36,26,31,.68);
+  font-weight: 800;
+}
+
+.memoryGrid{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.memoryTile{
+  aspect-ratio: 1 / 1;
+  border: 1px solid rgba(247,168,198,.18);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(252,227,238,.50));
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.memoryTile:active{
+  transform: scale(.98);
+}
+
+.memoryTile__inner{
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  font-weight: 900;
+  color: rgba(120,100,120,.30);
+  transition: transform .22s ease, opacity .22s ease;
+}
+
+.memoryTile--open .memoryTile__inner{
+  color: #241a1f;
+  transform: scale(1.04);
+}
+
+.memoryTile--done{
+  background: linear-gradient(180deg, rgba(247,168,198,.40), rgba(255,255,255,.96));
+  border-color: rgba(247,168,198,.34);
+  box-shadow: 0 10px 20px rgba(247,168,198,.18);
+}
+
+.memoryTile--done .memoryTile__inner{
+  color: #241a1f;
+}
+
+@media (max-width: 390px){
+  .memoryGrid{
+    gap: 8px;
+  }
+
+  .memoryTile__inner{
+    font-size: 26px;
+  }
+}
