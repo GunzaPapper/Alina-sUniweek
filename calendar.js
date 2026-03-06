@@ -179,7 +179,7 @@ function renderCalendar(root, viewDate, selectedDate, onPickDate, setViewDate) {
 
   root.innerHTML = `
     <div class="uniCal">
-[06.03.2026 14:19] Прога: <div class="uniCal__top">
+    <div class="uniCal__top">
         <button class="uniCal__nav" id="uniCalPrev" type="button">‹</button>
         <div class="uniCal__title">${monthTitle(viewDate)}</div>
         <button class="uniCal__nav" id="uniCalNext" type="button">›</button>
@@ -256,4 +256,5 @@ export function openCalendar({ state, onPickDate } = {}) {
 
   rerender();
 }
+
 
