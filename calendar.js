@@ -1,4 +1,3 @@
-[06.03.2026 14:19] Прога: // calendar.js
 const $ = (sel, root = document) => root.querySelector(sel);
 
 function startOfDay(d) {
@@ -257,3 +256,4 @@ export function openCalendar({ state, onPickDate } = {}) {
 
   rerender();
 }
+
