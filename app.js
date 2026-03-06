@@ -529,7 +529,6 @@ $("#calendarCloseBtn")?.addEventListener("click", () => {
 });
 
   $("#wishMoreBtn")?.addEventListener("click", showNextWish);
-}
 
 document.addEventListener("DOMContentLoaded", () => {
   disablePinchZoom();
