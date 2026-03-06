@@ -945,3 +945,78 @@ a {
   line-height: 1;
 }
 
+/* ===== Красивые карточки занятий ===== */
+.lessonCardPro{
+  --accent:#F7A8C6;
+  border-radius: 20px;
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(247,168,198,.16);
+  box-shadow: var(--shadow-soft);
+  padding: 14px 14px 12px 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.lessonCardPro::before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
+  width:6px;
+  background: var(--accent);
+}
+
+.lessonCardPro__head{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:8px;
+}
+
+.lessonCardPro__time{
+  font-size:14px;
+  font-weight:950;
+  letter-spacing:.2px;
+}
+
+.lessonCardPro__type{
+  font-size:12px;
+  font-weight:800;
+  color: rgba(36,26,31,.62);
+  white-space:nowrap;
+}
+
+.lessonCardPro__title{
+  font-size:16px;
+  line-height:1.25;
+  font-weight:950;
+  margin-bottom:4px;
+}
+
+.lessonCardPro__teacher{
+  font-size:13px;
+  font-weight:700;
+  color: rgba(36,26,31,.72);
+  margin-bottom:10px;
+}
+
+.lessonCardPro__meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+
+.lessonPill{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(247,168,198,.14);
+  background: rgba(255,255,255,.65);
+  font-size:12px;
+  font-weight:700;
+  color: rgba(36,26,31,.70);
+}
