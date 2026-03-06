@@ -20,12 +20,15 @@ function shuffle(arr) {
 
 function buildBoard() {
   const symbols = MEMORY_SYMBOLS.slice(0, 6);
-  board = shuffle([...symbols, ...symbols]).map((symbol, idx) => ({
+  const pairs = [...symbols, ...symbols];
+
+  board = shuffle(pairs).map((symbol, idx) => ({
     id: idx,
     symbol,
     open: false,
-    done: false
+    done: false,
   }));
+
   opened = [];
   locked = false;
   matched = 0;
@@ -35,14 +38,16 @@ function renderBoard() {
   const root = $("#memoryRoot");
   if (!root) return;
 
+  const totalPairs = MEMORY_SYMBOLS.slice(0, 6).length;
+
   root.innerHTML = `
     <div class="card card--soft" style="margin-bottom:12px;">
       <div class="cardHint">Найди все пары</div>
-      <div class="cardTitle" style="margin-top:6px;">Совпадений: ${matched} / ${MEMORY_SYMBOLS.slice(0, 6).length}</div>
+      <div class="cardTitle" style="margin-top:6px;">Совпадений: ${matched} / ${totalPairs}</div>
     </div>
 
     <div class="gameGrid" id="memoryGrid">
-      ${board.map(card => `
+      ${board.map((card) => `
         <button class="gameCard" type="button" data-id="${card.id}">
           <div class="gameCard__emoji" style="font-size:28px;">
             ${card.open || card.done ? card.symbol : "❔"}
@@ -52,16 +57,19 @@ function renderBoard() {
     </div>
   `;
 
-  root.querySelectorAll("[data-id]").forEach(btn => {
-    btn.addEventListener("click", () => openCard(Number(btn.getAttribute("data-id"))));
+  root.querySelectorAll("[data-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = Number(btn.getAttribute("data-id"));
+      openCard(id);
+    });
   });
 }
 
 function openCard(id) {
   if (locked) return;
 
-  const card = board.find(c => c.id === id);
-  if (!card  card.open  card.done) return;
+  const card = board.find((c) => c.id === id);
+  if (!card || card.open || card.done) return;
 
   card.open = true;
   opened.push(card);
@@ -72,18 +80,22 @@ function openCard(id) {
   locked = true;
 
   const [a, b] = opened;
+
   if (a.symbol === b.symbol) {
     a.done = true;
     b.done = true;
     a.open = true;
     b.open = true;
+
     opened = [];
     locked = false;
     matched++;
     renderBoard();
 
     if (matched === MEMORY_SYMBOLS.slice(0, 6).length) {
-      showPraise();
+      setTimeout(() => {
+        showPraise();
+      }, 250);
     }
   } else {
     setTimeout(() => {
