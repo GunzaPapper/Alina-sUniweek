@@ -1,5 +1,6 @@
 // schedule.js (CORE)
 // Один ответственный модуль: рендер списка пар + "следующая пара" + подсказки
+import { renderSchedule } from "./schedule.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
