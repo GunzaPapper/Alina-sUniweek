@@ -1,5 +1,5 @@
 // quiz.js
-import { QUIZ_QUESTIONS } from "./data.js";
+import { QUESTIONS_RAW, normalizeQuestions } from "./data.js";
 import { showPraise } from "./praise.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -7,7 +7,9 @@ const $ = (sel, root = document) => root.querySelector(sel);
 let quizState = {
   index: 0,
   score: 0,
-  questions: []
+  questions: [],
+  block: "mixed",
+  level: "mixed",
 };
 
 function shuffle(arr) {
@@ -19,19 +21,71 @@ function shuffle(arr) {
   return a;
 }
 
-function normalizeQuestions(raw) {
-  if (!Array.isArray(raw)) return [];
+function getSafeQuestions() {
+  const raw = normalizeQuestions(QUESTIONS_RAW);
 
   return raw.filter((q) => {
     return (
       q &&
-      typeof q.question === "string" &&
-      Array.isArray(q.options) &&
-      q.options.length >= 2 &&
-      typeof q.answer === "number" &&
-      q.answer >= 0 &&
-      q.answer < q.options.length
+      typeof q.q === "string" &&
+      Array.isArray(q.opts) &&
+      q.opts.length >= 2 &&
+      typeof q.a === "number" &&
+      q.a >= 0 &&
+      q.a < q.opts.length
     );
+  });
+}
+
+function pickQuestions() {
+  let list = getSafeQuestions();
+
+  if (quizState.block !== "mixed") {
+    list = list.filter((q) => q.block === quizState.block);
+  }
+
+  if (quizState.level !== "mixed") {
+    list = list.filter((q) => q.level === quizState.level);
+  }
+
+  return shuffle(list).slice(0, 5);
+}
+
+function renderStartScreen() {
+  const root = $("#quizRoot");
+  if (!root) return;
+
+  root.innerHTML = `
+    <div class="card card--soft" style="margin-bottom:12px;">
+      <div class="cardTitle">Quiz 💗</div>
+      <div class="cardHint" style="margin-top:6px;">Выбери тему и сложность</div>
+    </div>
+
+    <div class="row" style="margin-bottom:12px;">
+      <select class="input" id="quizBlockSelect">
+        <option value="mixed">Все темы</option>
+        <option value="history">История</option>
+        <option value="science">Наука</option>
+        <option value="literature">Литература</option>
+        <option value="geo">География</option>
+        <option value="logic">Логика</option>
+      </select>
+
+      <select class="input" id="quizLevelSelect">
+        <option value="mixed">Любая сложность</option>
+        <option value="easy">Лёгкий</option>
+        <option value="medium">Средний</option>
+        <option value="hard">Сложный</option>
+      </select>
+    </div>
+
+    <button class="btn" id="quizStartBtn" type="button">Начать</button>
+  `;
+
+  $("#quizStartBtn")?.addEventListener("click", () => {
+    quizState.block = $("#quizBlockSelect")?.value || "mixed";
+    quizState.level = $("#quizLevelSelect")?.value || "mixed";
+    startQuizRound();
   });
 }
 
@@ -42,10 +96,13 @@ function renderQuestion() {
   if (!Array.isArray(quizState.questions) || quizState.questions.length === 0) {
     root.innerHTML = `
       <div class="empty">
-        <div class="empty__title">Quiz пока недоступен 💗</div>
-        <div class="empty__text">Не удалось загрузить вопросы. Проверь data.js.</div>
+        <div class="empty__title">Нет подходящих вопросов 💗</div>
+        <div class="empty__text">Попробуй выбрать другую тему или сложность.</div>
       </div>
+      <button class="btn" id="quizBackToStartBtn" type="button" style="margin-top:12px;">Назад</button>
     `;
+
+    $("#quizBackToStartBtn")?.addEventListener("click", renderStartScreen);
     return;
   }
 
@@ -61,21 +118,23 @@ function renderQuestion() {
         <div class="empty__text">Очень достойно 💗</div>
       </div>
 
-      <button class="btn" id="quizRestartBtn" type="button" style="margin-top:12px;">Играть ещё</button>
+      <div class="row" style="margin-top:12px;">
+        <button class="btn" id="quizRestartBtn" type="button">Играть ещё</button>
+        <button class="btn btn--secondary" id="quizMenuBtn" type="button">В меню</button>
+      </div>
     `;
 
-    $("#quizRestartBtn")?.addEventListener("click", startQuiz);
+    $("#quizRestartBtn")?.addEventListener("click", startQuizRound);
+    $("#quizMenuBtn")?.addEventListener("click", renderStartScreen);
 
     if (quizState.score === quizState.questions.length) {
       setTimeout(() => showPraise(), 250);
     }
-
     return;
   }
 
   const q = quizState.questions[quizState.index];
-
-  if (!q || !Array.isArray(q.options)) {
+  if (!q || !Array.isArray(q.opts)) {
     quizState.index++;
     renderQuestion();
     return;
@@ -84,11 +143,11 @@ function renderQuestion() {
   root.innerHTML = `
     <div class="card card--soft" style="margin-bottom:12px;">
       <div class="cardHint">Вопрос ${quizState.index + 1} / ${quizState.questions.length}</div>
-      <div class="cardTitle" style="margin-top:6px;">${q.question}</div>
+      <div class="cardTitle" style="margin-top:6px;">${q.q}</div>
     </div>
 
     <div class="gameGrid" id="quizOptions" style="grid-template-columns:1fr;">
-      ${q.options.map((opt, idx) => `
+      ${q.opts.map((opt, idx) => `
         <button class="gameCard" type="button" data-answer="${idx}">
           <div class="gameCard__title">${opt}</div>
         </button>
@@ -99,7 +158,7 @@ function renderQuestion() {
   root.querySelectorAll("[data-answer]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const picked = Number(btn.getAttribute("data-answer"));
-      if (picked === q.answer) {
+      if (picked === q.a) {
         quizState.score++;
       }
       quizState.index++;
@@ -108,15 +167,10 @@ function renderQuestion() {
   });
 }
 
-export function startQuiz() {
-  const safeQuestions = normalizeQuestions(QUIZ_QUESTIONS);
-
-  quizState = {
-    index: 0,
-    score: 0,
-    questions: shuffle(safeQuestions).slice(0, 5)
-  };
-
+function startQuizRound() {
+  quizState.index = 0;
+  quizState.score = 0;
+  quizState.questions = pickQuestions();
   renderQuestion();
 }
 
@@ -124,7 +178,7 @@ export function initQuiz() {
   $("#openQuizBtn")?.addEventListener("click", () => {
     $("#quizCard")?.classList.remove("hidden");
     $("#memoryCard")?.classList.add("hidden");
-    startQuiz();
+    renderStartScreen();
   });
 
   $("#quizBackBtn")?.addEventListener("click", () => {
