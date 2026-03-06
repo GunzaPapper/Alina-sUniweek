@@ -1,5 +1,8 @@
-import { QUESTIONS_RAW } from "./data.js";
+import { getQuizQuestions } from "./data.js";
 import { showPraise } from "./praise.js";
+import { renderQuizProgress } from "./progress.js";
+import { STORAGE_KEYS, getNumber, setNumber } from "./storage.js";
+import { unlockAchievement, ACH } from "./achievements.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -20,46 +23,37 @@ function shuffle(arr) {
   return a;
 }
 
-function getSafeQuestions() {
-  if (!Array.isArray(QUESTIONS_RAW)) return [];
+function blockLabel(v) {
+  const map = {
+    mixed: "Все темы",
+    history: "История",
+    science: "Наука",
+    literature: "Литература",
+    geo: "География",
+    logic: "Логика",
+  };
+  return map[v] || v;
+}
 
-  const seen = new Set();
-
-  return QUESTIONS_RAW.filter((q) => {
-    const ok =
-      q &&
-      typeof q.q === "string" &&
-      Array.isArray(q.opts) &&
-      q.opts.length >= 2 &&
-      typeof q.a === "number" &&
-      q.a >= 0 &&
-      q.a < q.opts.length;
-
-    if (!ok) return false;
-
-    const key = JSON.stringify({
-      q: q.q,
-      opts: q.opts,
-      a: q.a,
-      block: q.block || "",
-      level: q.level || "",
-    });
-
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+function levelLabel(v) {
+  const map = {
+    mixed: "Любая сложность",
+    easy: "Лёгкий",
+    medium: "Средний",
+    hard: "Сложный",
+  };
+  return map[v] || v;
 }
 
 function pickQuestions() {
-  let list = getSafeQuestions();
+  let list = getQuizQuestions();
 
   if (quizState.block !== "mixed") {
-    list = list.filter((q) => (q.block || "mixed") === quizState.block);
+    list = list.filter(q => (q.block || "mixed") === quizState.block);
   }
 
   if (quizState.level !== "mixed") {
-    list = list.filter((q) => (q.level || "mixed") === quizState.level);
+    list = list.filter(q => (q.level || "mixed") === quizState.level);
   }
 
   return shuffle(list).slice(0, 5);
@@ -69,10 +63,12 @@ function renderStartScreen() {
   const root = $("#quizRoot");
   if (!root) return;
 
+  const best = getNumber(STORAGE_KEYS.QUIZ_BEST, 0);
+
   root.innerHTML = `
     <div class="card card--soft" style="margin-bottom:12px;">
       <div class="cardTitle">Quiz 💗</div>
-      <div class="cardHint" style="margin-top:6px;">Выбери тему и сложность</div>
+      <div class="cardHint" style="margin-top:6px;">Лучший результат: ${best}</div>
     </div>
 
     <div class="row" style="margin-bottom:12px;">
@@ -96,6 +92,8 @@ function renderStartScreen() {
     <button class="btn" id="quizStartBtn" type="button">Начать</button>
   `;
 
+  renderQuizProgress({ current: 0, total: 0 });
+
   $("#quizStartBtn")?.addEventListener("click", () => {
     quizState.block = $("#quizBlockSelect")?.value || "mixed";
     quizState.level = $("#quizLevelSelect")?.value || "mixed";
@@ -110,30 +108,34 @@ function renderQuestion() {
   if (!quizState.questions.length) {
     root.innerHTML = `
       <div class="empty">
-        <div class="empty__title">Нет вопросов по этому фильтру 💗</div>
-        <div class="empty__text">Выбери другую тему или сложность.</div>
+        <div class="empty__title">Нет вопросов по выбранному фильтру 💗</div>
+        <div class="empty__text">Попробуй другую тему или сложность.</div>
       </div>
-
-      <button class="btn" id="quizBackToMenuBtn" type="button" style="margin-top:12px;">
-        Назад
-      </button>
+      <button class="btn" id="quizBackToMenuBtn" type="button" style="margin-top:12px;">Назад</button>
     `;
-
+    renderQuizProgress({ current: 0, total: 0 });
     $("#quizBackToMenuBtn")?.addEventListener("click", renderStartScreen);
     return;
   }
 
   if (quizState.index >= quizState.questions.length) {
+    const best = Math.max(getNumber(STORAGE_KEYS.QUIZ_BEST, 0), quizState.score);
+    setNumber(STORAGE_KEYS.QUIZ_BEST, best);
+    setNumber(STORAGE_KEYS.QUIZ_PLAYED, getNumber(STORAGE_KEYS.QUIZ_PLAYED, 0) + 1);
+
+    unlockAchievement(ACH.FIRST_QUIZ);
+    if (quizState.score === quizState.questions.length) {
+      unlockAchievement(ACH.PERFECT_QUIZ);
+    }
+
     root.innerHTML = `
       <div class="card card--soft" style="margin-bottom:12px;">
         <div class="cardTitle">Quiz завершён 💗</div>
       </div>
 
       <div class="empty">
-        <div class="empty__title">
-          Правильных ответов: ${quizState.score} из ${quizState.questions.length}
-        </div>
-        <div class="empty__text">Очень достойно ✨</div>
+        <div class="empty__title">Правильных ответов: ${quizState.score} из ${quizState.questions.length}</div>
+        <div class="empty__text">Тема: ${blockLabel(quizState.block)} • ${levelLabel(quizState.level)}</div>
       </div>
 
       <div class="row" style="margin-top:12px;">
@@ -142,11 +144,15 @@ function renderQuestion() {
       </div>
     `;
 
+    renderQuizProgress({ current: quizState.questions.length, total: quizState.questions.length });
+
     $("#quizRestartBtn")?.addEventListener("click", startQuizRound);
     $("#quizMenuBtn")?.addEventListener("click", renderStartScreen);
 
     if (quizState.score === quizState.questions.length) {
-      setTimeout(() => showPraise(), 250);
+      setTimeout(() => {
+        showPraise({ title: "Идеально ✨", text: "Все ответы правильные. Ты супер!" });
+      }, 250);
     }
 
     return;
@@ -156,15 +162,9 @@ function renderQuestion() {
 
   root.innerHTML = `
     <div class="card card--soft" style="margin-bottom:12px;">
-      <div class="cardHint">
-        Вопрос ${quizState.index + 1} / ${quizState.questions.length}
-      </div>
-      <div class="cardHint" style="margin-top:4px;">
-        ${(q.block || "mixed")} • ${(q.level || "mixed")}
-      </div>
-      <div class="cardTitle" style="margin-top:8px;">
-        ${q.q}
-      </div>
+      <div class="cardHint">Вопрос ${quizState.index + 1} / ${quizState.questions.length}</div>
+      <div class="cardHint" style="margin-top:4px;">${blockLabel(q.block)} • ${levelLabel(q.level)}</div>
+      <div class="cardTitle" style="margin-top:8px;">${q.q}</div>
     </div>
 
     <div class="gameGrid" style="grid-template-columns:1fr;">
@@ -176,14 +176,12 @@ function renderQuestion() {
     </div>
   `;
 
+  renderQuizProgress({ current: quizState.index + 1, total: quizState.questions.length });
+
   root.querySelectorAll("[data-answer]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const picked = Number(btn.getAttribute("data-answer"));
-
-      if (picked === q.a) {
-        quizState.score++;
-      }
-
+      if (picked === q.a) quizState.score++;
       quizState.index++;
       renderQuestion();
     });
