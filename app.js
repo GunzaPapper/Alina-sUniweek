@@ -4,6 +4,7 @@ import { BASE_WISHES } from "./data.js";
 import { initPraise } from "./praise.js";
 import { initQuiz } from "./quiz.js";
 import { initMemory } from "./memory.js";
+import { openCalendar } from "./calendar.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -415,20 +416,26 @@ function bindEvents() {
   });
 
   $("#calendarOpenBtn")?.addEventListener("click", () => {
-    const dlg = $("#calendarModal");
-    const root = $("#calendarRoot");
+  const dlg = $("#calendarModal");
+  if (!dlg) return;
 
-    if (root) {
-      root.innerHTML = `
-        <div style="font-weight:900;margin-bottom:6px;">Скоро будет календарь ✨</div>
-        <div style="color:rgba(35,26,32,.72);font-weight:800;">
-          Сейчас подключены пожелания и игры. Следующим шагом можно красиво подключить calendar.js.
-        </div>
-      `;
+  dlg.showModal?.();
+
+  openCalendar({
+    state,
+    onPickDate: (date) => {
+      state.selectedDate = date;
+      dlg.close?.();
+      renderTopBar();
+      renderDayStrip();
+      renderMain();
     }
-
-    dlg?.showModal?.();
   });
+});
+
+$("#calendarCloseBtn")?.addEventListener("click", () => {
+  $("#calendarModal")?.close?.();
+});
 
   $("#calendarCloseBtn")?.addEventListener("click", () => {
     $("#calendarModal")?.close?.();
