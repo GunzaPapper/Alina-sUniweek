@@ -1,5 +1,7 @@
 import { MEMORY_SYMBOLS } from "./data.js";
 import { showPraise } from "./praise.js";
+import { STORAGE_KEYS, getNumber, setNumber } from "./storage.js";
+import { unlockAchievement, ACH } from "./achievements.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -26,14 +28,12 @@ function getSymbols() {
 
 function buildBoard() {
   const pairs = [...getSymbols(), ...getSymbols()];
-
   board = shuffle(pairs).map((symbol, idx) => ({
     id: idx,
     symbol,
     open: false,
     done: false
   }));
-
   opened = [];
   locked = false;
   matched = 0;
@@ -47,7 +47,6 @@ function renderBoard() {
 
   const cardsHtml = board.map((item) => {
     const isOpen = item.open || item.done;
-
     return `
       <button
         class="memoryTile ${isOpen ? "memoryTile--open" : ""} ${item.done ? "memoryTile--done" : ""}"
@@ -92,7 +91,6 @@ function openCard(id) {
   if (opened.length < 2) return;
 
   locked = true;
-
   const [a, b] = opened;
 
   if (a.symbol === b.symbol) {
@@ -104,8 +102,11 @@ function openCard(id) {
     renderBoard();
 
     if (matched === board.length / 2) {
+      setNumber(STORAGE_KEYS.MEMORY_WINS, getNumber(STORAGE_KEYS.MEMORY_WINS, 0) + 1);
+      unlockAchievement(ACH.FIRST_MEMORY);
+
       setTimeout(() => {
-        showPraise();
+        showPraise({ title: "Memory пройдено 💗", text: "Ты нашла все пары!" });
       }, 250);
     }
   } else {
