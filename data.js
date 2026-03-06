@@ -349,4 +349,36 @@ export const QUESTIONS_RAW = [
 ];
 export const MEMORY_SYMBOLS = ["💗", "🌸", "✨", "🎀", "🫶", "💞"];
 
+export function getQuizQuestions() {
 
+  if (!Array.isArray(QUESTIONS_RAW)) return [];
+
+  const byBaseId = new Map();
+
+  for (const q of QUESTIONS_RAW) {
+
+    if (!q || typeof q !== "object") continue;
+    if (!Array.isArray(q.opts)) continue;
+
+    const baseId = String(q.id || "")
+      .replace(/_fix$/i, "")
+      .trim();
+
+    const prev = byBaseId.get(baseId);
+
+    if (!prev) {
+      byBaseId.set(baseId, q);
+      continue;
+    }
+
+    const isPrevFix = /_fix$/i.test(prev.id || "");
+    const isCurFix = /_fix$/i.test(q.id || "");
+
+    if (!isPrevFix && isCurFix) {
+      byBaseId.set(baseId, q);
+    }
+
+  }
+
+  return Array.from(byBaseId.values());
+}
