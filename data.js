@@ -347,6 +347,5 @@ export const QUIZ_QUESTIONS = [
   { id:"log3_h10", block:"logic", level:"hard", q:"Сколько будет 9² − 8² ?", opts:["15","17","19","21"], a:0, exp:"(9−8)(9+8)=1×17=17… стоп: значит правильный 17." },
   { id:"log3_h10_fix", block:"logic", level:"hard", q:"Сколько будет 9² − 8² ?", opts:["15","17","19","21"], a:1, exp:"81−64=17." },
 ];
-}
 export const MEMORY_SYMBOLS = ["💗", "🌸", "✨", "🎀", "🫶", "💞"];
 
