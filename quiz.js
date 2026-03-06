@@ -19,12 +19,36 @@ function shuffle(arr) {
 }
 
 function getQuestions() {
-  return shuffle(clean).slice(0, 5);
+  if (!Array.isArray(QUESTIONS_RAW)) return [];
+
+  const safe = QUESTIONS_RAW.filter((q) => {
+    return (
+      q &&
+      typeof q.q === "string" &&
+      Array.isArray(q.opts) &&
+      q.opts.length >= 2 &&
+      typeof q.a === "number" &&
+      q.a >= 0 &&
+      q.a < q.opts.length
+    );
+  });
+
+  return shuffle(safe).slice(0, 5);
 }
 
 function renderQuestion() {
   const root = $("#quizRoot");
   if (!root) return;
+
+  if (!quizState.questions.length) {
+    root.innerHTML = `
+      <div class="empty">
+        <div class="empty__title">Quiz пока недоступен 💗</div>
+        <div class="empty__text">Не удалось загрузить вопросы.</div>
+      </div>
+    `;
+    return;
+  }
 
   if (quizState.index >= quizState.questions.length) {
     root.innerHTML = `
@@ -38,13 +62,13 @@ function renderQuestion() {
         </div>
       </div>
 
-      <button class="btn" id="quizRestartBtn">Играть ещё</button>
+      <button class="btn" id="quizRestartBtn" type="button">Играть ещё</button>
     `;
 
     $("#quizRestartBtn")?.addEventListener("click", startQuiz);
 
     if (quizState.score === quizState.questions.length) {
-      showPraise();
+      setTimeout(() => showPraise(), 250);
     }
 
     return;
@@ -57,7 +81,6 @@ function renderQuestion() {
       <div class="cardHint">
         Вопрос ${quizState.index + 1} / ${quizState.questions.length}
       </div>
-
       <div class="cardTitle" style="margin-top:6px;">
         ${q.q}
       </div>
@@ -65,16 +88,15 @@ function renderQuestion() {
 
     <div class="gameGrid" style="grid-template-columns:1fr;">
       ${q.opts.map((opt, idx) => `
-        <button class="gameCard" data-answer="${idx}">
+        <button class="gameCard" type="button" data-answer="${idx}">
           <div class="gameCard__title">${opt}</div>
         </button>
       `).join("")}
     </div>
   `;
 
-  root.querySelectorAll("[data-answer]").forEach(btn => {
+  root.querySelectorAll("[data-answer]").forEach((btn) => {
     btn.addEventListener("click", () => {
-
       const picked = Number(btn.getAttribute("data-answer"));
 
       if (picked === q.a) {
@@ -82,7 +104,6 @@ function renderQuestion() {
       }
 
       quizState.index++;
-
       renderQuestion();
     });
   });
@@ -99,18 +120,13 @@ function startQuiz() {
 }
 
 export function initQuiz() {
-
   $("#openQuizBtn")?.addEventListener("click", () => {
-
     $("#quizCard")?.classList.remove("hidden");
     $("#memoryCard")?.classList.add("hidden");
-
     startQuiz();
   });
 
   $("#quizBackBtn")?.addEventListener("click", () => {
-
     $("#quizCard")?.classList.add("hidden");
   });
-
 }
