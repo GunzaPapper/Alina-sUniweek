@@ -1,7 +1,7 @@
 {
   "name": "Alina's UniWeek",
   "short_name": "UniWeek",
-  "description": "UniWeek — расписание, пожелания и заметки. Работает офлайн."
+  "description": "UniWeek — расписание, пожелания и заметки",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -55,6 +55,11 @@
       "type": "image/png"
     },
     {
+      "src": "./icons/icon-256x256.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    },
+    {
       "src": "./icons/icon-384x384.png",
       "sizes": "384x384",
       "type": "image/png"
@@ -65,5 +70,4 @@
       "type": "image/png"
     }
   ]
-
 }
