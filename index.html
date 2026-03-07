@@ -1,7 +1,4 @@
-<div class="divider"></div>
-
-          <div class="settingsGroup">
-            <div class="settingsRow">
+<div class="settingsRow">
               <div>
                 <div class="settingsLabel">Импорт CSV</div>
                 <div class="settingsHint">courseName,type,dayOfWeek,startTime,endTime,weekType,location,color</div>
@@ -42,17 +39,14 @@
         <span class="tab__emoji">📅</span>
         <span class="tab__label">Расписание</span>
       </button>
-
       <button class="tab" id="tabWishes" type="button">
         <span class="tab__emoji">💗</span>
         <span class="tab__label">Пожелания</span>
       </button>
-
       <button class="tab" id="tabNotes" type="button">
         <span class="tab__emoji">📝</span>
         <span class="tab__label">Заметки</span>
       </button>
-
       <button class="tab" id="tabSettings" type="button">
         <span class="tab__emoji">⚙️</span>
         <span class="tab__label">Настройки</span>
@@ -63,15 +57,15 @@
       <div class="modal__body">
         <div class="modal__head">
           <div class="modal__title">Календарь</div>
-          <button class="iconBtn" id="calendarCloseBtn" type="button" aria-label="Закрыть">✕</button>
+          <button class="iconBtn" id="calendarCloseBtn" type="button">✕</button>
         </div>
         <div class="calendarRoot" id="calendarRoot"></div>
       </div>
     </dialog>
 
-    <div class="overlay hidden" id="praiseOverlay" aria-live="polite" aria-modal="true" role="dialog">
+    <div class="overlay hidden" id="praiseOverlay">
       <div class="overlay__card">
-        <div class="overlay__confetti" id="praiseConfetti" aria-hidden="true"></div>
+        <div class="overlay__confetti" id="praiseConfetti"></div>
         <div class="overlay__title" id="praiseTitle">Умничка 💗</div>
         <div class="overlay__text" id="praiseText">—</div>
         <button class="btn overlay__btn" id="praiseCloseBtn" type="button">Продолжить</button>
