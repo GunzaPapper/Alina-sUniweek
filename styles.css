@@ -1,72 +1,27 @@
-inset: 0;
-  z-index: 9999;
-  background:
-    radial-gradient(900px 500px at 20% 0%, rgba(246,168,196,.22), transparent 60%),
-    radial-gradient(700px 480px at 85% 10%, rgba(246,168,196,.15), transparent 60%),
-    linear-gradient(180deg, #fff8fb, #fff3f8 55%, #fff8fb);
-  display: grid;
-  place-items: center;
-  opacity: 1;
-  visibility: visible;
-  transition: opacity .45s ease, visibility .45s ease;
+switch__ui::after{
+  transform: translateX(24px);
 }
 
-.launchScreen--hide{
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.launchScreen__inner{
+.subjectColors{
   display: grid;
-  justify-items: center;
   gap: 12px;
-  animation: launchFloat .8s ease both;
 }
 
-.launchScreen__logoWrap{
-  width: 108px;
-  height: 108px;
-  border-radius: 28px;
-  background: rgba(255,255,255,.58);
-  box-shadow:
-    0 18px 40px rgba(42,31,37,.10),
-    inset 0 1px 0 rgba(255,255,255,.8);
+.achGrid{
   display: grid;
-  place-items: center;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  gap: 12px;
 }
 
-.launchScreen__logo{
-  width: 84px;
-  height: 84px;
-  object-fit: cover;
-  border-radius: 22px;
+.achCard{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(246,168,196,.16);
+  background: #fff;
+  box-shadow: var(--shadow-2);
+  padding: 14px;
 }
-
-.launchScreen__title{
-  font-size: 22px;
-  font-weight: 900;
-}
-
-.launchScreen__heart{
-  font-size: 18px;
-  opacity: .8;
-}
-
-@keyframes launchFloat{
-  from{
-    opacity: 0;
-    transform: translateY(10px) scale(.98);
-  }
-  to{
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* bottom nav */
 
 .bottomTabs{
   position: fixed;
@@ -89,7 +44,7 @@ inset: 0;
   border-radius: 24px;
   background: rgba(255,255,255,.98);
   border: 1px solid rgba(246,168,196,.18);
-  box-shadow: var(--shadow-soft-2);
+  box-shadow: var(--shadow-2);
   display: grid;
   place-items: center;
   gap: 2px;
@@ -98,7 +53,7 @@ inset: 0;
 }
 
 .tab--active{
-  background: linear-gradient(180deg, rgba(253,238,245,.98), rgba(255,255,255,.98));
+  background: linear-gradient(180deg, #fff0f6, #fff);
   border-color: rgba(233,142,176,.38);
 }
 
@@ -112,36 +67,107 @@ inset: 0;
   font-weight: 900;
 }
 
-/* helpers */
+.overlay{
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(42,31,37,.18);
+}
+
+.overlay.hidden{
+  display: none !important;
+}
+
+.overlay__card{
+  width: min(100%, 520px);
+  background: #fff;
+  border: 1px solid rgba(246,168,196,.22);
+  border-radius: 30px;
+  box-shadow: 0 20px 48px rgba(42,31,37,.16);
+  padding: 28px 20px 20px;
+  text-align: center;
+}
+
+.overlay__title{
+  font-size: 28px;
+  font-weight: 900;
+  margin-bottom: 10px;
+}
+
+.overlay__text{
+  font-size: 16px;
+  color: var(--muted);
+  font-weight: 800;
+  margin-bottom: 18px;
+}
+
+.overlay__btn{
+  width: 100%;
+}
+
+.launchScreen{
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: linear-gradient(180deg, #fff8fb, #fff3f8 55%, #fff8fb);
+  display: grid;
+  place-items: center;
+  transition: opacity .45s ease, visibility .45s ease;
+}
+
+.launchScreen--hide{
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.launchScreen__inner{
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+
+.launchScreen__logoWrap{
+  width: 108px;
+  height: 108px;
+  border-radius: 28px;
+  background: rgba(255,255,255,.58);
+  box-shadow: 0 18px 40px rgba(42,31,37,.10);
+  display: grid;
+  place-items: center;
+}
+
+.launchScreen__logo{
+  width: 84px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 22px;
+}
+
+.launchScreen__title{
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.launchScreen__heart{
+  font-size: 18px;
+}
 
 .main{
   padding-bottom: 136px;
 }
 
-#screenSchedule,
-#screenWishes,
-#screenNotes,
-#screenSettings{
-  padding-bottom: 8px;
-}
-
-/* responsive */
-
 @media (max-width: 430px){
   .topBar{
     margin: 0 10px 10px;
     padding: 8px 10px 8px;
-    grid-template-columns: 52px 1fr 104px;
-    gap: 8px;
-  }
-
-  .topBar__title{
-    font-size: 17px;
   }
 
   .dayStripWrap{
     margin: 0 10px 12px;
-    top: calc(var(--top-safe) + 84px);
   }
 
   .dayStrip{
@@ -162,38 +188,6 @@ inset: 0;
     margin-bottom: 12px;
   }
 
-  .lessonBody{
-    padding: 16px 16px 16px 20px;
-  }
-
-  .lessonName{
-    font-size: 18px;
-  }
-
-  .lessonTeacher{
-    font-size: 15px;
-  }
-
-  .gameGrid{
-    gap: 10px;
-  }
-
-  .memoryGrid{
-    gap: 8px;
-  }
-
-  .memoryTile__inner{
-    font-size: 26px;
-  }
-
-  .row{
-    flex-wrap: wrap;
-  }
-
-  .colorRow{
-    grid-template-columns: 1fr;
-  }
-
   .bottomTabs{
     gap: 8px;
     padding: 8px 8px calc(var(--bottom-safe) + 8px);
@@ -206,5 +200,13 @@ inset: 0;
 
   .tab__emoji{
     font-size: 24px;
+  }
+
+  .row{
+    flex-wrap: wrap;
+  }
+
+  .settingsRow{
+    flex-wrap: wrap;
   }
 }
