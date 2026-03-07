@@ -1,7 +1,8 @@
-// achievements.js
 import { STORAGE_KEYS, getJSON, setJSON } from "./storage.js";
 
-const ACH = {
+const $ = (sel, root = document) => root.querySelector(sel);
+
+export const ACH = {
   FIRST_QUIZ: "first_quiz",
   PERFECT_QUIZ: "perfect_quiz",
   FIRST_MEMORY: "first_memory"
@@ -23,7 +24,36 @@ export function unlockAchievement(id) {
 
 export function getAchievements() {
   const list = getJSON(STORAGE_KEYS.ACHIEVEMENTS, []);
-  return list.map((id) => ({ id, title: TITLES[id] || id }));
+  return list.map((id) => ({
+    id,
+    title: TITLES[id] || id
+  }));
 }
 
-export { ACH };
+export function renderAchievements() {
+  const root = $("#achievementsRoot");
+  if (!root) return;
+
+  const list = getAchievements();
+
+  if (!list.length) {
+    root.innerHTML = `
+      <div class="empty">
+        <div class="empty__title">Пока нет достижений ✨</div>
+        <div class="empty__text">Играй в Quiz и Memory</div>
+      </div>
+    `;
+    return;
+  }
+
+  root.innerHTML = `
+    <div class="achGrid">
+      ${list.map(a => `
+        <div class="achCard">
+          <div class="achIcon">🏆</div>
+          <div class="achTitle">${a.title}</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
