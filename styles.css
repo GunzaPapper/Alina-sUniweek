@@ -1,12 +1,4 @@
-position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background:
-    radial-gradient(900px 500px at 20% 0%, rgba(247,168,198,.22), transparent 60%),
-    radial-gradient(700px 480px at 85% 10%, rgba(247,168,198,.15), transparent 60%),
-    linear-gradient(180deg, #fff8fb, #fff3f8 55%, #fff8fb);
-  display: grid;
-  place-items: center;
+place-items: center;
   opacity: 1;
   visibility: visible;
   transition: opacity .45s ease, visibility .45s ease;
@@ -49,7 +41,6 @@ position: fixed;
 .launchScreen__title{
   font-size: 22px;
   font-weight: 900;
-  color: #2a1f25;
 }
 
 .launchScreen__heart{
@@ -68,7 +59,7 @@ position: fixed;
   }
 }
 
-/* ===== bottom tabs ===== */
+/* bottom nav */
 
 .bottomTabs{
   position: fixed;
@@ -80,7 +71,7 @@ position: fixed;
   background: rgba(255,247,251,.94);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 -10px 26px rgba(47,32,40,.06);
+  box-shadow: 0 -10px 26px rgba(42,31,37,.06);
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
@@ -89,8 +80,8 @@ position: fixed;
 .tab{
   min-height: 82px;
   border-radius: 24px;
-  background: rgba(255,255,255,.96);
-  border: 1px solid rgba(246,168,196,.20);
+  background: rgba(255,255,255,.98);
+  border: 1px solid rgba(246,168,196,.18);
   box-shadow: var(--shadow-soft-2);
   display: grid;
   place-items: center;
@@ -100,8 +91,8 @@ position: fixed;
 }
 
 .tab--active{
-  background: linear-gradient(180deg, rgba(253,238,245,.95), rgba(255,255,255,.98));
-  border-color: rgba(239,143,179,.42);
+  background: linear-gradient(180deg, rgba(253,238,245,.98), rgba(255,255,255,.98));
+  border-color: rgba(233,142,176,.38);
 }
 
 .tab__emoji{
@@ -114,24 +105,20 @@ position: fixed;
   font-weight: 900;
 }
 
-/* ===== helpers ===== */
-
-body.settingsMode .main{
-  padding-bottom: 24px;
-}
+/* helpers */
 
 .main{
-  padding: 0 12px 140px;
+  padding-bottom: 136px;
 }
 
 #screenSchedule,
 #screenWishes,
 #screenNotes,
 #screenSettings{
-  padding-bottom: 10px;
+  padding-bottom: 8px;
 }
 
-/* ===== responsive ===== */
+/* responsive */
 
 @media (max-width: 430px){
   .topBar{
@@ -157,7 +144,6 @@ body.settingsMode .main{
 
   .dayPill{
     min-height: 96px;
-    gap: 5px;
   }
 
   .main{
@@ -181,6 +167,10 @@ body.settingsMode .main{
     font-size: 15px;
   }
 
+  .gameGrid{
+    gap: 10px;
+  }
+
   .memoryGrid{
     gap: 8px;
   }
@@ -189,12 +179,12 @@ body.settingsMode .main{
     font-size: 26px;
   }
 
-  .gameGrid{
-    gap: 10px;
+  .row{
+    flex-wrap: wrap;
   }
 
-  .gameCard{
-    padding: 16px;
+  .colorRow{
+    grid-template-columns: 1fr;
   }
 
   .bottomTabs{
@@ -209,13 +199,5 @@ body.settingsMode .main{
 
   .tab__emoji{
     font-size: 24px;
-  }
-
-  .row{
-    flex-wrap: wrap;
-  }
-
-  .colorRow{
-    grid-template-columns: 1fr;
   }
 }
