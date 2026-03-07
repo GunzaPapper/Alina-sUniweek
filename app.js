@@ -7,6 +7,7 @@ import { initMemory } from "./memory.js";
 import { openCalendar } from "./calendar.js";
 import { initNotes, openNotes } from "./notes.js";
 import { initSwipe } from "./swipe.js";
+import { renderAchievements } from "./achievementsView.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -149,14 +150,11 @@ function renderTopBar() {
   const monthTitle = $("#monthTitle");
   const weekSubtitle = $("#weekSubtitle");
 
-  if (monthTitle) {
-    monthTitle.textContent = "Alina's UniWeek 💗";
-  }
+  if (monthTitle) monthTitle.textContent = "Alina's UniWeek 💗";
 
   if (weekSubtitle) {
     const wt = getWeekType(state.selectedDate);
-    weekSubtitle.textContent =
-      wt === "odd" ? "Неделя: числитель" : "Неделя: знаменатель";
+    weekSubtitle.textContent = wt === "odd" ? "Неделя: числитель" : "Неделя: знаменатель";
   }
 }
 
@@ -182,27 +180,22 @@ function renderDayStrip() {
     days.push(d);
   }
 
-  strip.innerHTML = days
-    .map((d) => {
-      const active = isSameDay(d, state.selectedDate);
-      const dow = d.toLocaleDateString("ru-RU", { weekday: "short" }).toUpperCase();
-      const ddmm = d.toLocaleDateString("ru-RU", {
-        day: "2-digit",
-        month: "2-digit",
-      });
-      const todayMark = isSameDay(d, today)
-        ? `<div class="todayDot"><span class="todayDot__text">today</span></div>`
-        : "";
+  strip.innerHTML = days.map((d) => {
+    const active = isSameDay(d, state.selectedDate);
+    const dow = d.toLocaleDateString("ru-RU", { weekday: "short" }).toUpperCase();
+    const ddmm = d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+    const todayMark = isSameDay(d, today)
+      ? `<div class="todayDot"><span class="todayDot__text">today</span></div>`
+      : "";
 
-      return `
-        <button class="dayPill ${active ? "dayPill--active" : ""}" type="button" data-date="${d.toISOString()}">
-          <div class="dayPill__dow">${esc(dow)}</div>
-          <div class="dayPill__date">${esc(ddmm)}</div>
-          ${todayMark}
-        </button>
-      `;
-    })
-    .join("");
+    return `
+      <button class="dayPill ${active ? "dayPill--active" : ""}" type="button" data-date="${d.toISOString()}">
+        <div class="dayPill__dow">${esc(dow)}</div>
+        <div class="dayPill__date">${esc(ddmm)}</div>
+        ${todayMark}
+      </button>
+    `;
+  }).join("");
 
   $$(".dayPill", strip).forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -219,26 +212,23 @@ function renderSubjectColors() {
   const root = $("#subjectColors");
   if (!root) return;
 
-  const subjects = Array.from(
-    new Set((state.schedule || []).map((x) => x.courseName).filter(Boolean))
-  ).sort((a, b) => a.localeCompare(b, "ru"));
+  const subjects = Array.from(new Set((state.schedule || []).map((x) => x.courseName).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, "ru"));
 
   if (!subjects.length) {
     root.innerHTML = `<div class="empty__text">Появится после импорта расписания 💗</div>`;
     return;
   }
 
-  root.innerHTML = subjects
-    .map((name) => {
-      const val = state.subjectColors[name] || "";
-      return `
-        <div class="colorRow">
-          <div class="colorRow__name">${esc(name)}</div>
-          <input class="input" data-subject="${esc(name)}" value="${esc(val)}" placeholder="#F7A8C6" />
-        </div>
-      `;
-    })
-    .join("");
+  root.innerHTML = subjects.map((name) => {
+    const val = state.subjectColors[name] || "";
+    return `
+      <div class="colorRow">
+        <div class="colorRow__name">${esc(name)}</div>
+        <input class="input" data-subject="${esc(name)}" value="${esc(val)}" placeholder="#F7A8C6" />
+      </div>
+    `;
+  }).join("");
 
   $$("input[data-subject]", root).forEach((inp) => {
     inp.addEventListener("change", () => {
@@ -270,6 +260,7 @@ function renderSettings() {
   evenBtn?.classList.toggle("segBtn--active", state.manualWeek === "even");
 
   renderSubjectColors();
+  renderAchievements();
 }
 
 function renderMain() {
@@ -299,6 +290,10 @@ function showNextWish() {
 
   if (!wishPool.length) refillWishPool();
   box.textContent = wishPool.pop() || "Ты умничка 💗";
+
+  box.classList.remove("wishBox--animated");
+  void box.offsetWidth;
+  box.classList.add("wishBox--animated");
 }
 
 function bindEvents() {
@@ -392,10 +387,7 @@ function bindEvents() {
       exportedAt: new Date().toISOString(),
     };
 
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: "application/json",
-    });
-
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -445,91 +437,6 @@ function bindEvents() {
   $("#wishMoreBtn")?.addEventListener("click", showNextWish);
 }
 
-  $("#csvInput")?.addEventListener("change", async (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-
-    try {
-      const text = await f.text();
-      const res = importScheduleFromCsv(text);
-
-      if (res.ok && Array.isArray(res.lessons)) {
-        state.schedule = res.lessons;
-        saveLS(LS.SCHEDULE, state.schedule);
-      }
-
-      alert(res.msg || "Импорт завершён");
-      renderMain();
-      renderSettings();
-    } catch (err) {
-      alert("Ошибка чтения файла: " + (err?.message || err));
-    } finally {
-      e.target.value = "";
-    }
-  });
-
-  $("#exportJsonBtn")?.addEventListener("click", () => {
-    const data = {
-      schedule: state.schedule,
-      subjectColors: state.subjectColors,
-      manualWeek: state.manualWeek,
-      autoWeek: state.autoWeek,
-      anchorDate: state.anchorDate,
-      exportedAt: new Date().toISOString(),
-    };
-
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: "application/json",
-    });
-
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "uniweek-export.json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  });
-
-  $("#resetAllBtn")?.addEventListener("click", () => {
-    if (!confirm("Сбросить всё?")) return;
-
-    for (const k of Object.values(LS)) {
-      localStorage.removeItem(k);
-    }
-
-    loadAll();
-    renderTopBar();
-    renderDayStrip();
-    renderMain();
-    renderSettings();
-  });
-
-  $("#calendarOpenBtn")?.addEventListener("click", () => {
-  const dlg = $("#calendarModal");
-  if (!dlg) return;
-
-  dlg.showModal?.();
-
-  openCalendar({
-    state,
-    onPickDate: (date) => {
-      state.selectedDate = date;
-      dlg.close?.();
-      renderTopBar();
-      renderDayStrip();
-      renderMain();
-    }
-  });
-});
-
-$("#calendarCloseBtn")?.addEventListener("click", () => {
-  $("#calendarModal")?.close?.();
-});
-
-  $("#wishMoreBtn")?.addEventListener("click", showNextWish);
-
 document.addEventListener("DOMContentLoaded", () => {
   disablePinchZoom();
   loadAll();
@@ -564,4 +471,11 @@ document.addEventListener("DOMContentLoaded", () => {
       renderMain();
     }
   });
+
+  const launch = document.getElementById("launchScreen");
+  if (launch) {
+    setTimeout(() => {
+      launch.classList.add("launchScreen--hide");
+    }, 850);
+  }
 });
