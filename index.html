@@ -1,43 +1,22 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta name="theme-color" content="#f7bfd3" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="UniWeek" />
-
-  <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180x180.png" />
-  <link rel="manifest" href="./manifest.webmanifest" />
   <meta charset="utf-8" />
-  <!-- anti-zoom + safe area -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#F7A8C6" />
+  <meta name="theme-color" content="#f7bfd3" />
+  <meta name="color-scheme" content="light" />
 
-  <!-- PWA / iOS -->
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-
-  <!-- (чтобы Safari/Chrome не пытались делать авто-тёмную тему и не чернел верх) -->
-  <meta name="color-scheme" content="light" />
+  <meta name="apple-mobile-web-app-title" content="UniWeek" />
 
   <title>Alina's UniWeek</title>
 
   <link rel="manifest" href="./manifest.webmanifest" />
-
-  <!-- icons -->
   <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180x180.png" />
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32x32.png" />
-
   <link rel="stylesheet" href="./styles.css" />
-
-  <meta name="theme-color" content="#f7bfd3" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="UniWeek" />
-
-<link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180x180.png" />
-<link rel="manifest" href="./manifest.webmanifest" />
 </head>
 
 <body>
@@ -50,16 +29,8 @@
       <div class="launchScreen__heart">💗</div>
     </div>
   </div>
-  <meta name="theme-color" content="#f7bfd3" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="UniWeek" />
 
-  <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180x180.png" />
-  <link rel="manifest" href="./manifest.webmanifest" />
-  
   <div class="appRoot" id="appRoot">
-    <!-- Top bar -->
     <header class="topBar" id="topBar">
       <div class="topBar__left">
         <button class="iconBtn" id="dayPrevBtn" type="button" aria-label="Предыдущий день">‹</button>
@@ -76,14 +47,11 @@
       </div>
     </header>
 
-    <!-- Day strip -->
     <section class="dayStripWrap" id="dayStripWrap">
       <div class="dayStrip" id="dayStrip" aria-label="Дни недели"></div>
     </section>
 
-    <!-- Main -->
     <main class="main" id="main">
-      <!-- Schedule -->
       <section class="screen screen--active" id="screenSchedule" aria-label="Расписание">
         <div class="card card--soft fadeIn" id="nextLessonCard" aria-live="polite"></div>
 
@@ -96,7 +64,6 @@
         </div>
       </section>
 
-      <!-- Wishes + Games -->
       <section class="screen" id="screenWishes" aria-label="Пожелания">
         <div class="card fadeIn">
           <div class="cardHeader">
@@ -127,7 +94,6 @@
           </div>
         </div>
 
-        <!-- Quiz view -->
         <div class="card fadeIn hidden" id="quizCard">
           <div class="cardHeader">
             <button class="chipBtn" id="quizBackBtn" type="button">← Назад</button>
@@ -137,7 +103,6 @@
           <div id="quizRoot"></div>
         </div>
 
-        <!-- Memory view -->
         <div class="card fadeIn hidden" id="memoryCard">
           <div class="cardHeader">
             <button class="chipBtn" id="memoryBackBtn" type="button">← Назад</button>
@@ -148,7 +113,6 @@
         </div>
       </section>
 
-      <!-- Notes -->
       <section class="screen" id="screenNotes" aria-label="Заметки">
         <div class="card fadeIn">
           <div class="cardHeader">
@@ -189,7 +153,7 @@
               <button class="btn btn--danger" id="noteDeleteBtn" type="button">Удалить</button>
             </div>
 
-            <textarea class="textarea" id="noteBodyInput" placeholder="Текст… (автосейв)"></textarea>
+            <textarea class="textarea" id="noteBodyInput" placeholder="Текст…"></textarea>
 
             <div class="checklist hidden" id="noteChecklist"></div>
             <button class="btn btn--secondary hidden" id="checklistAddItemBtn" type="button">Добавить пункт</button>
@@ -197,7 +161,6 @@
         </div>
       </section>
 
-      <!-- Settings -->
       <section class="screen" id="screenSettings" aria-label="Настройки">
         <div class="card fadeIn">
           <div class="cardHeader">
@@ -259,10 +222,17 @@
             <div class="subjectColors" id="subjectColors"></div>
           </div>
         </div>
+
+        <div class="card fadeIn">
+          <div class="cardHeader">
+            <div class="cardTitle">Достижения</div>
+            <div class="cardHint">маленькие победы ✨</div>
+          </div>
+          <div id="achievementsRoot"></div>
+        </div>
       </section>
     </main>
 
-    <!-- Bottom tabs -->
     <nav class="bottomTabs" aria-label="Навигация">
       <button class="tab tab--active" id="tabSchedule" type="button">
         <span class="tab__emoji">📅</span>
@@ -282,7 +252,6 @@
       </button>
     </nav>
 
-    <!-- Calendar modal -->
     <dialog class="modal" id="calendarModal">
       <div class="modal__body">
         <div class="modal__head">
@@ -293,7 +262,6 @@
       </div>
     </dialog>
 
-    <!-- Praise overlay -->
     <div class="overlay hidden" id="praiseOverlay" aria-live="polite" aria-modal="true" role="dialog">
       <div class="overlay__card">
         <div class="overlay__confetti" id="praiseConfetti" aria-hidden="true"></div>
@@ -304,11 +272,6 @@
     </div>
   </div>
 
-  <!-- Важно: подключаем ТОЛЬКО app.js.
-       Он уже модульно импортирует остальные файлы:
-       calendar.js, notes.js, quiz.js, memory.js, praise.js, swipe.js, csvParser.js, progress.js, achievements.js -->
   <script type="module" src="./app.js"></script>
 </body>
 </html>
-
-
