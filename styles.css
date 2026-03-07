@@ -1,4 +1,11 @@
-place-items: center;
+inset: 0;
+  z-index: 9999;
+  background:
+    radial-gradient(900px 500px at 20% 0%, rgba(246,168,196,.22), transparent 60%),
+    radial-gradient(700px 480px at 85% 10%, rgba(246,168,196,.15), transparent 60%),
+    linear-gradient(180deg, #fff8fb, #fff3f8 55%, #fff8fb);
+  display: grid;
+  place-items: center;
   opacity: 1;
   visibility: visible;
   transition: opacity .45s ease, visibility .45s ease;
